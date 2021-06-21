@@ -1,0 +1,42 @@
+#ifndef SIGNALS_LITERALS_HPP_INCLUDED
+#define SIGNALS_LITERALS_HPP_INCLUDED
+
+#include <vector>
+#include <string>
+
+const std::vector<std::string> signals = {
+	"SUCCESS",
+	"SIGHUP",
+	"SIGINT",
+	"SIGQUIT",
+	"SIGILL",
+	"SIGTRAP",
+	"SIGABRT",
+	"SIGBUS",
+	"SIGFPE",
+	"SIGKILL",
+	"SIGUSR1",
+	"SIGSEGV",
+	"SIGUSR2",
+	"SIGPIPE",
+	"SIGALRM",
+	"SIGTERM",
+	"SIGSTKFLT",
+	"SIGCHLD",
+	"SIGCONT",
+	"SIGSTOP",
+	"SIGTSTP",
+	"SIGTTIN",
+	"SIGTTOU",
+	"SIGURG",
+	"SIGXCPU",
+	"SIGXFSZ",
+	"SIGVTALRM",
+	"SIGPROF",
+	"SIGWINCH",
+	"SIGIO",
+	"SIGPWR",
+	"SIGSYS",
+};
+
+#endif //SIGNALS_LITERALS_HPP_INCLUDED
