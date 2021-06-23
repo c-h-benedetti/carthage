@@ -2,11 +2,34 @@
 #include <unistd.h>
 #include "Subprocess.hpp"
 
-int main(int argc, char* argv[], char* env[]){
+class SomeObject{
+  int some_attribute = 0;
 
-  std::function<void(Subprocess::State)> f1 = [=](Subprocess::State s){
-    std::cout << "State: " << (int)s << std::endl;
-  };
+  public:
+
+    std::function<void(Subprocess::State)> f1 = [=](Subprocess::State s){
+      this->process_signal(s);
+    };
+
+    void process_signal(Subprocess::State state){
+      switch(state){
+        case(Subprocess::State::RUNNING):
+          this->some_attribute = 10;
+          break;
+
+        case(Subprocess::State::FINISHED):
+          this->some_attribute = 1;
+          break;
+
+        default:
+          break;
+      };
+      std::cout << "My attribute is " << this->some_attribute << std::endl;
+    }
+
+};
+
+int main(int argc, char* argv[], char* env[]){
 
   Subprocess s{
     "blender", // Command from the PATH
@@ -19,7 +42,8 @@ int main(int argc, char* argv[], char* env[]){
     "blender" // Name of process in terminal (purely aesthetic)
   };
 
-  s.subscribe_to(f1); // Registering a callback function
+  SomeObject obj{};
+  s.subscribe_to(obj.f1); // Registering a callback function
   s.launch();
 
   // Without while, the parent process reaches the end
