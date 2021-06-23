@@ -34,7 +34,6 @@ int main(int argc, char* argv[], char* env[]){
   Subprocess s{
     "blender", // Command from the PATH
     {
-      "/home/clement/Desktop/observer/loading_observer_1.blend", // File to open
       "--python-expr", // This argument and the next have for purpose to disable python buffering on stdout to get instantly the results of print()
       "import sys\ntry:\n    sys.stdout.reconfigure(line_buffering=True)\nexcept TypeError:\n    sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)"
     },

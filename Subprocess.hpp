@@ -24,7 +24,6 @@ enum PStatus{
   FAILED_FORK=(1<<2),
 };
 
-
 class Subprocess{
 
   public:
