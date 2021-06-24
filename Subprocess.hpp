@@ -33,7 +33,8 @@ class Subprocess{
       INITIALIZED=(1<<0),
       RUNNING=(1<<1),
       FINISHED=(1<<2),
-      DESTROYED=(1<<3)
+      DESTROYED=(1<<3),
+      KILLED=(1<<4)
     };
 
   protected:
@@ -71,6 +72,7 @@ class Subprocess{
     int     launch();     // Launches the subprocess with the current settings
     void    terminate();  // Kills the subprocess
     void    subscribe_to(const std::function<void(State)>& f);
+    void    subscribe_to(const std::function<void(State)>&& f);
 
     Subprocess(
       std::string cmd="echo",
@@ -78,6 +80,11 @@ class Subprocess{
       std::string log_path="last_log.log",
       std::string p_name="Blank Launcher"
     );
+
+    Subprocess(const Subprocess& s);
+    Subprocess& operator=(Subprocess s);
+    Subprocess(Subprocess&& s);
+    Subprocess& operator=(Subprocess&& s);
 
     ~Subprocess();
 

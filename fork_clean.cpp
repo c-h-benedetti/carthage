@@ -21,10 +21,13 @@ class SomeObject{
           this->some_attribute = 1;
           break;
 
+        case(Subprocess::State::KILLED):
+          this->some_attribute = 20;
+          break;
+
         default:
           break;
       };
-      std::cout << "My attribute is " << this->some_attribute << std::endl;
     }
 
 };
@@ -47,9 +50,13 @@ int main(int argc, char* argv[], char* env[]){
 
   // Without while, the parent process reaches the end
   // In a real software, we suppose that we are in the main execution loop
-
+  int i = 0;
   while(s.get_state() == Subprocess::State::RUNNING){
     std::cout << "RUNNING" << std::endl;
+    if (i > 20){ // Stop execution after 20 seconds
+      s.terminate();
+    }
+    i++;
     sleep(1);
   }
 
