@@ -85,13 +85,13 @@ int Subprocess::overlay(){
   // Trying to overlay the forked process
   if (execvp(args[0], args) == -1){
     args[0] = (char*)this->_command_.c_str(); // We failed, we try to use the emergency command
-    std::cerr << "Failed to overlay with main command while launching: " + this->process_name << ". Trying with \"" + this->_command_ + "\"" << std::endl;
+    if(this->_verbose){std::cerr << "Failed to overlay with main command while launching: " + this->process_name << ". Trying with \"" + this->_command_ + "\"" << std::endl;}
     
     if (execvp(args[0], args) == -1){
-      std::cerr << "Failed to overlay emergency command: " + this->process_name << std::endl;
+      if(this->_verbose){std::cerr << "Failed to overlay emergency command: " + this->process_name << std::endl;}
     }
 
-    std::cerr << "Failed to overlay process while launching: " + this->process_name << std::endl;
+    if(this->_verbose){std::cerr << "Failed to overlay process while launching: " + this->process_name << std::endl;}
     return PStatus::FAILED_OVERLAY;
   }
 
@@ -105,13 +105,13 @@ void Subprocess::is_over(){
       this->thread_is_alive.join();
     }
     else{
-      std::cerr << "Failed to join thread [thread_is_alive] (Maybe never launched?)" << std::endl;
+      if(this->_verbose){std::cerr << "Failed to join thread [thread_is_alive] (Maybe never launched?)" << std::endl;}
     }
     if (this->thread_listener.joinable()){
       this->thread_listener.join();
     }
     else{
-      std::cerr << "Failed to join thread [thread_listener] (Maybe never launched?)" << std::endl;
+      if(this->_verbose){std::cerr << "Failed to join thread [thread_listener] (Maybe never launched?)" << std::endl;}
     }
     this->pid = 0;
   }
@@ -121,7 +121,7 @@ void Subprocess::is_over(){
 int Subprocess::launch(){
 
   if (this->state != State::INITIALIZED){
-    std::cerr << "Unable to call launch() on this Subprocess object" << std::endl;
+    if(this->_verbose){std::cerr << "Unable to call launch() on this Subprocess object" << std::endl;}
     return -1;
   }
 
@@ -129,7 +129,7 @@ int Subprocess::launch(){
 
   // Creating the pipe to communicate with sub process
   if (pipe(this->file_descriptors) == -1){
-    std::cerr << "Failed to create the pipe while launching: " + this->process_name << std::endl;
+    if(this->_verbose){std::cerr << "Failed to create the pipe while launching: " + this->process_name << std::endl;}
     return PStatus::FAILED_PIPE;
   }
 
@@ -138,7 +138,7 @@ int Subprocess::launch(){
     // If the fork fails, we don't need to communicate with anything process
     close(this->file_descriptors[PIPE_OUTPUT]);
     close(this->file_descriptors[PIPE_INPUT]);
-    std::cerr << "Failed to fork current process while launching: " + this->process_name << std::endl;
+    if(this->_verbose){std::cerr << "Failed to fork current process while launching: " + this->process_name << std::endl;}
     return PStatus::FAILED_FORK;
   }
 
@@ -164,7 +164,7 @@ int Subprocess::launch(){
     close(this->file_descriptors[PIPE_OUTPUT]); // dup2 cloned descriptors, so we don't need originals ones anymore
     close(this->file_descriptors[PIPE_INPUT]);
 
-    std::cerr << "Pipe created successfully !!!" << std::endl; // First line of every log file
+    if(this->_verbose){std::cerr << "Pipe created successfully !!!" << std::endl;} // First line of every log file
 
     if (this->overlay()){
       // If overlaying failed, we don't further in the child code
@@ -211,7 +211,7 @@ int Subprocess::get_return_status() const{
 
 void Subprocess::secure_log_path(){
   if (this->log_file_path.size() == 0){
-    std::cerr << "Log file path shouldn't be left empty" << std::endl;
+    if(this->_verbose){std::cerr << "Log file path shouldn't be left empty" << std::endl;}
     this->log_file_path = "/tmp/log_subprocess.log";
   }
 }
@@ -222,13 +222,13 @@ void wait_for_subprocess(Subprocess* s, pid_t pid){
   s->set_state(Subprocess::State::FINISHED);
 
   if (!WIFEXITED(status)){
-    printf("Process %d didn't end up correctly\n", pid);
+    if(s->_verbose){printf("Process %d didn't end up correctly\n", pid);}
     if (WIFSIGNALED(status)){
-      printf("Process %d ended up because of an unhandled signal: %s\n", pid, signals[WTERMSIG(status)].c_str());
+      if(s->_verbose){printf("Process %d ended up because of an unhandled signal: %s\n", pid, signals[WTERMSIG(status)].c_str());}
     }
   }
   else{
-    printf("Process %d finished correctly with status code %d\n", pid, WEXITSTATUS(status));
+    if(s->_verbose){printf("Process %d finished correctly with status code %d\n", pid, WEXITSTATUS(status));}
   }
 
   s->return_status = status;

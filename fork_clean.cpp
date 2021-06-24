@@ -37,6 +37,7 @@ int main(int argc, char* argv[], char* env[]){
   Subprocess s{
     "blender", // Command from the PATH
     {
+      "/home/clement.benedetti/Bureau/empty.blend",
       "--python-expr", // This argument and the next have for purpose to disable python buffering on stdout to get instantly the results of print()
       "import sys\ntry:\n    sys.stdout.reconfigure(line_buffering=True)\nexcept TypeError:\n    sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)"
     },
@@ -50,17 +51,11 @@ int main(int argc, char* argv[], char* env[]){
 
   // Without while, the parent process reaches the end
   // In a real software, we suppose that we are in the main execution loop
-  int i = 0;
+  
   while(s.get_state() == Subprocess::State::RUNNING){
-    std::cout << "RUNNING" << std::endl;
-    if (i > 20){ // Stop execution after 20 seconds
-      s.terminate();
-    }
-    i++;
+    //std::cout << "RUNNING" << std::endl;
     sleep(1);
   }
-
-  std::cout << "END" << std::endl;
 
   return 0;
 }

@@ -37,6 +37,8 @@ class Subprocess{
       KILLED=(1<<4)
     };
 
+    bool _verbose = false;
+
   protected:
 
     std::string command = "echo"; // Command to execute
