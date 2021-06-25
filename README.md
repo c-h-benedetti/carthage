@@ -1,4 +1,4 @@
-# OBSERVER
+<h1 align="center">OBSERVER</h1>
 
 ## Progress
 
