@@ -1,0 +1,279 @@
+<!DOCTYPE HTML>
+
+<html>
+	<head>
+		<title>Test Fetching Paths</title>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.15.6/highlight.min.js"></script>
+		<script>hljs.initHighlightingOnLoad();</script>
+		<link rel="stylesheet" type="text/css" href="includes/highlight/styles/agate.min.css">
+		<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Oxygen">
+		<style>
+			body{
+				font-family: "Oxygen";
+				line-height: 1.2em;
+			}
+
+			.code{
+				font-family: monospace;
+				background-color: #1B1B1B;
+				padding: 3px;
+				border-radius: 3px;
+				color:  white;
+			}
+
+			h1{
+				padding-top: 60px;
+				padding-bottom: 20px;
+				text-align: center;
+			}
+			h2{
+				margin-top: 80px;
+				text-align: center;
+			}
+			h3{
+				margin-top: 25px;
+				text-align: center;
+			}
+			table, tr, th, td{
+				border: solid 1px black;
+				font-family: monospace;
+				font-weight: normal;
+				font-size: 1.05em;
+				border-collapse: collapse;
+				text-align: center;
+			}
+			th{
+				font-weight: bold;
+			}
+			table{
+				/*display: inline-block;*/
+				position: relative;
+				transform: translateX(-50%);
+				left: 50%;
+			}
+			
+			th, td{
+				padding: 6px;
+			}
+			hr{
+				margin-top: -12px;
+			}
+			.time_exec{
+				display: inline-block;
+			}
+			p{
+				text-align: justify;
+				text-justify: inter-word;
+			}
+			.code_block{
+				font-family: monospace;
+				text-align: left;
+				padding: 15px;
+				background-color: #1B1B1B;
+				color: white;
+				border-radius: 3px;
+				display: inline-block;
+				margin: 5px;
+			}
+			ul{
+				position: relative;
+				left: 50%;
+				transform: translateX(-50%);
+				width: 75%;
+			}
+			li{
+				margin-bottom: 15px;
+			}
+			.code_block > .type{
+				color: rgb(52, 235, 52);
+				font-weight: bold;
+			}
+			.code_block > .string{
+				color: rgb(52, 204, 235);
+			}
+		</style>
+	</head>
+	<body>
+		<h1> — FETCHING LINKED FILES PATHS IN BINARY FILES — </h1>
+		<h2>Make vary the size of the buffer</h2>
+		<hr/>
+		<h3>Synopsis</h3>
+		<p>
+			To avoid making repetitive requests to the disk with <span class="code">ifstream::get()</span> the function <span class="code">get_char()</span> was created in a class inheriting from <span class="code">ifstream</span>. This new class makes use of a buffer to store a whole chunk of file at each reading operation. Then, calls to <span class="code">get_char()</span> fetch a <span class="code">char</span> from that buffer rather than from the disk. New readings occur only when the buffer has been fully read.
+		</p>
+		<h3>Test</h3>
+		<p>
+			In this test, we make vary the size of the buffer.
+			In theory, a smaller buffer should increase the number of calls to the disk and enlarge execution time.
+		</p>
+		<div class="wrapper">
+			<table>
+				<tr>
+					<th>Size of buffer (bytes)</th>
+					<th>Average execution time (seconds)</th>
+				</tr>
+				<tr>
+					<td>8</td>
+					<td>34.2126</td>
+				</tr>
+				<tr>
+					<td>128</td>
+					<td>34.7296</td>
+				</tr>
+				<tr>
+					<td>1024</td>
+					<td>33.3875</td>
+				</tr>
+				<tr>
+					<td>8192</td>
+					<td>33.4980</td>
+				</tr>
+				<tr>
+					<td>65536</td>
+					<td>33.6136</td>
+				</tr>
+			</table>
+		</div>
+		<p>
+			Contrary to what was expected, the buffer's size doesn't influence the global time that much. The main time consuption seems to be in the filtering operation, and not in the reading of the file.
+		</p>
+
+
+		<h2>Inlining little functions often called</h2>
+		<hr/>
+		<h3>Synopsis</h3>
+		<p>
+			The <span class="code">get_char()</span> function is called very often and the code inside it is very simplistic, in a for loop containing only this instruction, the function's overhead might be more important than the function itself in terms of processing time. We try to compare time with and without <span class="code">inline</span> statement.
+		</p>
+		<h3>Test</h3>
+		<div class="wrapper">
+			<table>
+				<tr>
+					<th><span class="code">inline</span></th>
+					<th>not <span class="code">inline</span></th>
+				</tr>
+				<tr>
+					<td>33.5953</td>
+					<td>33.4980</td>
+				</tr>
+			</table>
+		</div>
+		<p>
+			Once again, we can see that <span class="code">inline</span> has no effect in our case. We conclude that the main time is required by the filter, and definitely not by the reading of the file.
+		</p>
+
+		<h2>Copying a file</h2>
+		<hr/>
+		<h3>Synopsis</h3>
+		<p>
+			To test our reading class, we deduced from the 2 previous tests that it must be extracted from any other function, since these functions are heavier than the execution of our class.
+			We will try to copy a file with a simple <span class="code">while</span> and no other code.
+			While copying, we will tweak the size of the buffer and the inlining.
+			That way, we will be able to measure the overhead of our function and it's actual execution time.
+		</p>
+		<h3>Test</h3>
+		<div class="wrapper">
+			<table>
+				<tr>
+					<th>Size of buffer (bytes)</th>
+					<th>With <span class="code">inline</span> (seconds)</th>
+					<th>Without <span class="code">inline</span> (seconds)</th>
+				</tr>
+				<tr>
+					<td>1</td>
+					<td>9.9745</td>
+					<td>10.1662</td>
+				</tr>
+				<tr>
+					<td>8</td>
+					<td>4.9091</td>
+					<td>4.9785</td>
+				</tr>
+				<tr>
+					<td>1024</td>
+					<td>3.6556</td>
+					<td>3.7236</td>
+				</tr>
+				<tr>
+					<td>2048</td>
+					<td>3.6473</td>
+					<td>3.7010</td>
+				</tr>
+				<tr>
+					<td>8192</td>
+					<td>3.7524</td>
+					<td>4.0574</td>
+				</tr>
+				<tr>
+					<td>65536</td>
+					<td>3.7141</td>
+					<td>3.7812</td>
+				</tr>
+			</table>
+		</div>
+		<p>
+			We can see that the buffer effectivelly improves processing time. The size of the buffer doesn't have a linear influence on performances. Smaller sizes will give a terrible time but we quickly reach a cap which stays steady (around 3 seconds) from 1024 to 65536.
+			Globally inlining improves performances but it is much less significant than expected (overall without buffering aka size of buffer to 1).
+		</p>
+
+		<h2> C++ tweakings for optimization </h2>
+		<hr/>
+
+		<h3>Array allocation</h3>
+
+		<div class="code_block" style="width:47%; height: 24em; float:  right;">
+			while (to_filter.get_char(c)){<br/>&nbsp;&nbsp;&nbsp;&nbsp;size_t i = 0;<br/>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:red;">std::string found(w_dir.size(), 0);</span><br/>&nbsp;&nbsp;&nbsp;&nbsp;luint pos = to_filter.tellgc();<br/><br/>&nbsp;&nbsp;&nbsp;&nbsp;while((i < w_dir.size()) && (c == w_dir[i])){<br/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:red;">found[i++] = c;</span><br/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (!to_filter.get_char(c)){<br/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>&nbsp;&nbsp;&nbsp;&nbsp;}<br/>&nbsp;&nbsp;&nbsp;&nbsp;if(i == w_dir.size()){<br/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;indices.push_back(pos-1);<br/>&nbsp;&nbsp;&nbsp;&nbsp;}<br/>}
+		</div>
+
+		<div class="code_block" style="width:47%; height: 24em; float:  right;">
+			while (to_filter.get_char(c)){<br/>&nbsp;&nbsp;&nbsp;&nbsp;size_t i = 0;<br/>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:red;">std::string found = "";</span><br/>&nbsp;&nbsp;&nbsp;&nbsp;luint pos = to_filter.tellgc();<br/><br/>&nbsp;&nbsp;&nbsp;&nbsp;while((i < w_dir.size()) && (c == w_dir[i])){<br/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:red;">found.push_back(c);<br/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;i++;</span><br/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (!to_filter.get_char(c)){<br/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br/>&nbsp;&nbsp;&nbsp;&nbsp;}<br/>&nbsp;&nbsp;&nbsp;&nbsp;if(i == w_dir.size()){<br/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;indices.push_back(pos-1);<br/>&nbsp;&nbsp;&nbsp;&nbsp;}<br/>}
+		</div>
+
+		<p>
+			Pass from the implementation on the left to the one on the right makes the program execution time pass from an average of approximately 63 seconds to 39 seconds. Avoiding copy of content on reallocation of the <span class="code">std::string</span> saves a lot of time.
+		</p>
+
+		<h2>C-like VS. C++ like implementation to load file</h2>
+		<hr/>
+		
+		<table style="table-layout: fixed; width: 100%;">
+			<tr>
+				<th style="width: 50%;">C++ implementation</th>
+				<th style="width: 50%;">C-like implementation</th>
+			</tr>
+			<tr>
+				<td style="width: 50%;">
+					<div class="code_block" style="width: 90%; height: 20em;">
+						<span class="type">std::string</span> path = <span class="string">"/home/clement/Desktop/tests-cpp/"</span>;<br/>
+						<span class="type">std::string</span> file = <span class="string">"long_blend.blend"</span>;<br/>
+						<br/>
+						<span class="type">std::ifstream</span> t(path + file);<br/>
+						<span class="type">std::string</span> str((std::istreambuf_iterator<<span class="type">char</span>>(t)), std::istreambuf_iterator<<span class="type">char</span>>());<br/>
+						t.close();<br/>
+					</div>
+				</td>
+				<td style="width: 50%;">
+					<div class="code_block" style="width: 90%; height: 20em;">
+						<span class="type">std::string</span> read_file(<span class="type">std::string</span> file_name) {<br/>
+						&nbsp;&nbsp;&nbsp;&nbsp;<span class="type">FILE*</span> fp = fopen(file_name.c_str(), "r");<br/>
+						<br/>
+						&nbsp;&nbsp;&nbsp;&nbsp;if (fp == NULL) {<br/>
+						&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;printf("File Not Found!\n");<br/>
+						&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return nullptr;<br/>
+						&nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+						<br/>
+						&nbsp;&nbsp;&nbsp;&nbsp;fseek(fp, 0L, SEEK_END);<br/>
+						&nbsp;&nbsp;&nbsp;&nbsp;<span class="type">luint</span> res = ftell(fp);<br/>
+						&nbsp;&nbsp;&nbsp;&nbsp;<span class="type">std::string</span> s(res, '\0');<br/>
+						&nbsp;&nbsp;&nbsp;&nbsp;fseek(fp, 0L, SEEK_SET);<br/>
+						&nbsp;&nbsp;&nbsp;&nbsp;fread(&s[0], 1, res, fp);<br/>
+						&nbsp;&nbsp;&nbsp;&nbsp;fclose(fp);<br/>
+						&nbsp;&nbsp;&nbsp;&nbsp;return s;<br/>
+						}
+					</div>
+				</td>
+			</tr>
+		</table>
+		
+	</body>
+</html>

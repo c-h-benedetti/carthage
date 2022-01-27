@@ -1,4 +1,4 @@
-__old__
-*.log
-FORK
-EXE
+data/*
+sessions/*
+MAIN
+testing.zip
