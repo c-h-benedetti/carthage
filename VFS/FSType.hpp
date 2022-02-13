@@ -1,7 +1,9 @@
 #ifndef FSTYPES_DEFINITION_HEADER_INCLUDED
 #define FSTYPES_DEFINITION_HEADER_INCLUDED
 
-enum class FSType : char{
+#include <cinttypes>
+
+enum class FSType : uint8_t{
 	UNKNOWN,
 	REMOVED,
 	ROOT,

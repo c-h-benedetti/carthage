@@ -1,5 +1,5 @@
 #include <iostream>
-#include "Buffer.hpp"
+#include "StackSegment.hpp"
 
 int main(int argc, char* argv[], char* env[]){
 
@@ -7,12 +7,12 @@ int main(int argc, char* argv[], char* env[]){
 
 	std::cout << " = STARTING =" << std::endl;
 
-	Buffer<8> b1{};
-	Buffer<8> b2{b1};
-	Buffer<8> b3{txt, 8};
-	Buffer<8> b4{txt, 12};
-	Buffer<8> b5 = b4;
-	Buffer<9> b6{};
+	StackSegment<8> b1{};
+	StackSegment<8> b2{b1};
+	StackSegment<8> b3{txt, 8};
+	StackSegment<8> b4{txt, 12};
+	StackSegment<8> b5 = b4;
+	StackSegment<9> b6{};
 
 	std::cout << " = PART 1 =" << std::endl;
 
@@ -44,9 +44,9 @@ int main(int argc, char* argv[], char* env[]){
 	char c2[9] = {};
 	char c3[9] = {};
 
-	b1.get(c1, 9);
-	b3.get(c2, 9);
-	b4.get(c3, 9);
+	b1.copy_all(c1);
+	b3.copy_all(c2);
+	b4.copy_all(c3);
 
 	std::cout << c1 << std::endl;
 	std::cout << c2 << std::endl;
@@ -71,7 +71,7 @@ int main(int argc, char* argv[], char* env[]){
 	std::cout << " = PART 7 =" << std::endl;
 
 
-	Buffer<8> b9{};
+	StackSegment<8> b9{};
 	b9.add<char>(48);
 	b9.write_to(std::cout);
 
