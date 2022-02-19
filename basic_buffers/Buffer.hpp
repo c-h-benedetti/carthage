@@ -15,10 +15,10 @@ public:
 	inline bool is_full() const { return this->pos >= K; }
 
 	template <typename T>
-	void add(const T& t);
+	BasicBuffer<K>& add(const T& t);
 
-	void add(const void* src);
-	void add(const void* src, const size_t& sz);
+	BasicBuffer<K>& add(const void* src);
+	BasicBuffer<K>& add(const void* src, const size_t& sz);
 };
 
 #include "Buffer.tpp"

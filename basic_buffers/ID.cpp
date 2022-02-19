@@ -4,6 +4,10 @@
 
 
 ID::ID(int a){
+	this->randomize();
+}
+
+void ID::randomize(){
 	std::random_device rd;
 	std::mt19937 mt(rd());
 	std::uniform_int_distribution<uint8_t> dist(0, SIZE_IDS_ENTRY - 1);

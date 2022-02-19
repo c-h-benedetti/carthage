@@ -2,8 +2,14 @@
 #define FSBLOCK_HPP_INCLUDED
 
 #include "utils.h"
+#include "ID.hpp"
+#include "Name.hpp"
+#include "Extension.hpp"
 
 class FSBlock {
+
+public:
+
 	FSPos content = 0;
 	ID id;
 	Name name;
@@ -21,6 +27,9 @@ class FSBlock {
 	FSPos dependencies = 0;
 	UID owner = 0;
 	UID group = 0;
+
+	void after_reading();
+	void before_writting();
 };
 
 static_assert(
@@ -38,6 +47,11 @@ static_assert(
 	sizeof(FSPos) +
 	2 * sizeof(UID) == sizeof(FSBlock),
 	"Issue with padding of FSBlock"
+);
+
+static_assert(
+	sizeof(FSBlock) == 152,
+	"Size of FSBlock different from the expected one"
 );
 
 #endif // FSBLOCK_HPP_INCLUDED

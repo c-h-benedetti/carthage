@@ -13,6 +13,7 @@ public:
 
 	ID() = default;
 	ID(int a);
+	void randomize();
 
 };
 

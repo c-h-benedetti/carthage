@@ -1,9 +1,9 @@
-cmake_minimum_required(VERSION 3.10.2 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.12 FATAL_ERROR)
 
-project(Carthage)
-set(CMAKE_CXX_STANDARD 17)
+project(Carthage LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 20)
 
-set(BUFFERS
+set(BUFFERS_SRC
 	basic_buffers/Buffer.cpp
 	basic_buffers/Buffer.hpp
 	basic_buffers/Buffer.tpp
@@ -20,8 +20,79 @@ set(BUFFERS
 	basic_buffers/StackSegment.tpp
 	basic_buffers/SystemName.hpp
 	basic_buffers/SystemName.cpp
+)
+
+set(VFS_SRC
+	VFS/FSBlock.cpp
+	VFS/FSBlock.hpp
+	VFS/FSObject.hpp
+	VFS/FSObject.cpp
+	VFS/FSType.hpp
+	VFS/utils.c
+	VFS/utils.h
+	VFS/File.hpp 
+	VFS/File.cpp 
+	VFS/Folder.hpp 
+	VFS/Folder.cpp 
+	VFS/Versionable.hpp 
+	VFS/Versionable.cpp 
+	VFS/Container.hpp 
+	VFS/Container.cpp 
+	VFS/FileSystem.hpp 
+	VFS/FileSystem.cpp
+)
+
+set(ROOT_SRC
+	main.cpp
+)
+
+# = = = = BUFFERS = = = = 
+
+add_library(BUFFERS_LIB
+	${BUFFERS_SRC}
+)
+
+target_include_directories(BUFFERS_LIB 
+	PUBLIC basic_buffers
+)
+
+add_executable(Buffers_test
+	${BUFFERS_SRC}
 	basic_buffers/main.cpp
 )
 
+# = = = = VFS = = = = 
+
+add_library(VFS_LIB
+	${VFS_SRC}
+)
+
+target_include_directories(VFS_LIB 
+	PUBLIC basic_buffers
+	PUBLIC VFS
+)
+
+add_executable(VFS_test
+	${VFS_SRC}
+	VFS/main.cpp
+)
+
+target_link_libraries(VFS_test
+	PUBLIC BUFFERS_LIB
+)
+
+# = = = = PROJECT = = = = 
+
 add_executable(${PROJECT_NAME}
-	${BUFFERS})
+	${ROOT_SRC}
+)
+
+target_include_directories(${PROJECT_NAME} 
+	PUBLIC basic_buffers
+	PUBLIC VFS
+)
+
+target_link_libraries(${PROJECT_NAME}
+	PUBLIC BUFFERS_LIB
+	PUBLIC VFS_LIB
+)
