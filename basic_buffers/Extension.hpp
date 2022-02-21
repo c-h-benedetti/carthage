@@ -13,6 +13,8 @@ public:
 	Extension();
 	Extension(const char* c);
 
+	void override(const void* src, const size_t& s);
+
 };
 
 inline void valid_ext_char(uint8_t& c){

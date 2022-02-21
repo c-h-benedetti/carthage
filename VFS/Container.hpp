@@ -22,10 +22,9 @@ public:
 	virtual size_t size() const = 0;
 
 	Container() = default;
-	Container(const Path& p, FileSystem* fs);
-	Container(const FSBlock& bck, const FSPos& pos, FileSystem* fs);
+	Container(FileSystem* fs);
 	Container(const FSObject& obj);
-	Container(const Path& p, const FSBlock& bck, const FSPos& pos, FileSystem* fs);
+	Container(const FSBlock& bck, const FSPos& pos, FileSystem* fs);
 
 };
 

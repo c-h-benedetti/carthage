@@ -8,10 +8,8 @@ void File::load(){
 	std::cerr << "Launching file: " << this->block.name << std::endl;
 }
 
-File::File(const Path& p, FileSystem* fs): FSObject(p, fs){}
+File::File(FileSystem* fs): FSObject(fs){}
+
+File::File(const FSObject& obj): FSObject(obj){}
 
 File::File(const FSBlock& bck, const FSPos& pos, FileSystem* fs): FSObject(bck, pos, fs){}
-
-File::File(const FSObject& obj): FSObject(obj){
-
-}

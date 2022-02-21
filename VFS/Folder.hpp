@@ -22,14 +22,9 @@ public:
 	size_t size() const override;
 
 	Folder() = default;
-	Folder(const Path& p, FileSystem* fs);
-	Folder(const FSBlock& bck, const FSPos& pos, FileSystem* fs);
+	Folder(FileSystem* fs);
 	Folder(const FSObject& obj);
-
-	/*void add_file(const SystemName& name, FileSystem* fs);
-	void add_folder(const SystemName& name, FileSystem* fs);
-	void add_files(const std::vector<SystemName>& names, FileSystem* fs);
-	void add_folders(const std::vector<SystemName>& names, FileSystem* fs);*/
+	Folder(const FSBlock& bck, const FSPos& pos, FileSystem* fs);
 
 };
 

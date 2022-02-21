@@ -38,6 +38,7 @@ void Folder::dispatch(const std::vector<FSObject>& segment){
 
 
 	for(size_t i = 0 ; i < segment.size() ; i++){
+		// IMPROVE: Use FSType methods instead of a switch
 		switch (segment[i].data().flag){
 			case(FSType::FILE):
 				this->files.push_back(File(segment[i]));
@@ -53,72 +54,8 @@ void Folder::dispatch(const std::vector<FSObject>& segment){
 }
 
 
-Folder::Folder(const Path& p, FileSystem* fs): Container(p, fs){}
-
-Folder::Folder(const FSBlock& bck, const FSPos& pos, FileSystem* fs): Container(bck, pos, fs){}
+Folder::Folder(FileSystem* fs): Container(fs){}
 
 Folder::Folder(const FSObject& obj): Container(obj){}
 
-/*void Folder::add_file(const SystemName& name, FileSystem* fs){
-	FSBlock b;
-	b.id = ID(1); // Add a method to generate an ID without using the constructor
-	b.name = name; // operator() = copy 
-	b.flag = FSType::FILE;
-	b.extension = Extension("test"); // operator() = copy 
-	b.parent = this->block_pos;
-
-	BasicBuffer<2*sizeof(FSPos)+sizeof(FSBlock)> buffer;
-	buffer.add<FSize>(1);
-	buffer.add<FSBlock>(b);
-	buffer.add<FSPos>(0);
-
-	std::ofstream o_str(fs->vfs_path, std::ios::out | std::ios::binary | std::ios::in);
-	o_str.seekp(0, std::ios_base::end);
-	FSPos insert = o_str.tellp();
-	buffer.write_to(o_str);
-
-	this->block.nb_files++;
-	bool empty = false;
-
-	if (!this->block.content){
-		this->block.content = insert;
-		empty = true;
-	}
-
-	o_str.seekp(this->block_pos);
-	this->block.write(o_str);
-	o_str.close();
-
-	if(!empty){
-		std::ifstream i_str(fs->vfs_path, std::ios::binary | std::ios::in);
-		FSPos c_pos = this->block.content;
-		FSize seg_size = 0;
-
-		while(c_pos){
-			i_str.seekg(c_pos);
-			i_str.read((char*)&seg_size, sizeof(FSize));
-			i_str.seekg(i_str.tellg() + seg_size * sizeof(FSBlock));
-			i_str.read((char*)&c_pos, sizeof(FSPos));
-		}
-
-		FSPos last = i_str.tellg() - sizeof(FSPos);
-		i_str.close();
-
-		std::ofstream n_str(fs->vfs_path, std::ios::out | std::ios::binary | std::ios::in);
-		n_str.seekp(last);
-		n_str.write((char*)&insert, sizeof(FSPos));
-		n_str.close();		
-	}
-}
-
-void Folder::add_folder(const SystemName& name, FileSystem* fs){
-
-}
-
-void Folder::add_files(const std::vector<SystemName>& names, FileSystem* fs){
-
-}
-
-void Folder::add_folders(const std::vector<SystemName>& names, FileSystem* fs){
-
-}*/
+Folder::Folder(const FSBlock& bck, const FSPos& pos, FileSystem* fs): Container(bck, pos, fs){}

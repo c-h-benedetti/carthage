@@ -4,13 +4,15 @@
 #include "StackSegment.hpp"
 #include "LUT_chars.h"
 
-#define SIZE_OF_NAME 31
+#define SIZE_OF_NAME 32
 
 class Name : public StackSegment<SIZE_OF_NAME>{
 
 	void validate();
 
 public:
+
+	void override(const void* src, const size_t& s);
 
 	Name();
 	Name(const char* c);

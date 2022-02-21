@@ -8,12 +8,6 @@ void Versionable::open(){
 
 void Versionable::dispatch(const std::vector<FSObject>& segment){}
 
-Versionable::Versionable(const Path& p, FileSystem* fs): Container(p, fs){}
-
-Versionable::Versionable(const FSBlock& bck, const FSPos& pos, FileSystem* fs): Container(bck, pos, fs){}
-
-Versionable::Versionable(const FSObject& obj): Container(obj){}
-
 size_t Versionable::size() const{
 	return 0;
 }
@@ -21,3 +15,9 @@ size_t Versionable::size() const{
 FSObject* Versionable::at(size_t i){
 	return nullptr;
 }
+
+Versionable::Versionable(FileSystem* fs): Container(fs){}
+
+Versionable::Versionable(const FSObject& obj): Container(obj){}
+
+Versionable::Versionable(const FSBlock& bck, const FSPos& pos, FileSystem* fs): Container(bck, pos, fs){}

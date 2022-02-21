@@ -4,6 +4,10 @@ void StackSegment<N>::nullify(){
 	memset(this->buffer, 0, N);
 }
 
+template <size_t N>
+StackSegment<N>::StackSegment(const uint8_t& c){
+	memset(this->buffer, c, N);
+}
 
 template <size_t N>
 StackSegment<N>::StackSegment(const StackSegment<N>& b){
@@ -60,4 +64,10 @@ template <size_t K>
 std::istream& operator>>(std::istream& o, StackSegment<K>& s){
 	s.read_from(o);
 	return o;
+}
+
+template <size_t N>
+StackSegment<N>& StackSegment<N>::operator=(const char* str){
+	this->override(str, N);
+	return *this;
 }

@@ -16,9 +16,9 @@ public:
 	FSObject* at(size_t i);
 
 	Versionable() = default;
-	Versionable(const Path& p, FileSystem* fs);
-	Versionable(const FSBlock& bck, const FSPos& pos, FileSystem* fs);
+	Versionable(FileSystem* fs);
 	Versionable(const FSObject& obj);
+	Versionable(const FSBlock& bck, const FSPos& pos, FileSystem* fs);
 
 };
 

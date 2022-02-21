@@ -1,13 +1,11 @@
 #include "FileSystem.hpp"
 #include <fstream>
 
-Container::Container(const Path& p, FileSystem* fs): FSObject(p, fs){}
-
-Container::Container(const FSBlock& bck, const FSPos& pos, FileSystem* fs): FSObject(bck, pos, fs){}
+Container::Container(FileSystem* fs): FSObject(fs){}
 
 Container::Container(const FSObject& obj): FSObject(obj){}
 
-Container::Container(const Path& p, const FSBlock& bck, const FSPos& pos, FileSystem* fs):FSObject(p, bck, pos, fs){}
+Container::Container(const FSBlock& bck, const FSPos& pos, FileSystem* fs): FSObject(bck, pos, fs){}
 
 void Container::collect_content(std::vector<FSObject>& segment){
 	FSPos c_pos = this->block.content;
@@ -15,7 +13,7 @@ void Container::collect_content(std::vector<FSObject>& segment){
 	segment.clear();
 	segment.reserve(this->block.nb_files + this->block.nb_folders + this->block.nb_versionables);
 
-	std::ifstream str(this->refer_to->vfs_path, std::ios::binary | std::ios::in);
+	std::ifstream str(this->refer_to->vfs_path(), std::ios::binary | std::ios::in);
 
 	if (!str.is_open()){
 		std::cerr << "Failed to open VFS" << std::endl;

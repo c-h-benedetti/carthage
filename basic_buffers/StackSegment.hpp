@@ -17,12 +17,14 @@ protected:
 public:
 
 	StackSegment() = default;
+	StackSegment(const uint8_t& c);
 	StackSegment(const StackSegment<N>& b);
 	StackSegment(const void* c, const size_t& s); 
 	StackSegment<N>& operator=(const StackSegment<N>& b);
+	StackSegment<N>& operator=(const char* str);
 
 	StackSegment(StackSegment<N>&& b) = delete;
-	StackSegment& operator=(StackSegment<N>&& b) = delete;
+	StackSegment<N>& operator=(StackSegment<N>&& b) = delete;
 
 	inline size_t length() const{ 
 		if (this->buffer[N-1]){
@@ -50,7 +52,8 @@ public:
 
 	inline uint8_t& operator[](const size_t& i){return this->buffer[i];}
 	inline uint8_t operator[](const size_t& i) const{return this->buffer[i];}
-
+	inline const char* c_str() const{ return (const char*)this->buffer; };
+	inline const uint8_t* data() const{ return this->buffer; }
 };
 
 

@@ -28,12 +28,11 @@ public:
 	inline const FSBlock& data() const{ return this->block; }
 
 	virtual void open(){}
-	void reload_from_vfs(const bool& reset_path=true);
+	void reload_from_vfs();
 
 	FSObject() = delete;
 	FSObject(FileSystem* fs);
-	FSObject(const Path& p, FileSystem* fs);
-	FSObject(const FSBlock& bck, const Path& p, const FSPos& pos, FileSystem* fs);
+	FSObject(const FSBlock& bck, const FSPos& pos, FileSystem* fs);
 
 };
 

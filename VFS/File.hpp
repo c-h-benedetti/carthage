@@ -14,9 +14,9 @@ public:
 	void open() override;
 
 	File() = default;
-	File(const Path& p, FileSystem* fs);
-	File(const FSBlock& bck, const FSPos& pos, FileSystem* fs);
+	File(FileSystem* fs);
 	File(const FSObject& obj);
+	File(const FSBlock& bck, const FSPos& pos, FileSystem* fs);
 };
 
 #endif // VFS_FILE_HPP_INCLUDED

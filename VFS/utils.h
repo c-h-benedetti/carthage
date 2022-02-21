@@ -2,6 +2,7 @@
 #define GENERAL_UTILS_HPP_INCLUDED
 
 #include <filesystem>
+#include <stdexcept>
 
 #include "SystemName.hpp"
 #include "Name.hpp"

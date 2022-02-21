@@ -11,6 +11,7 @@ class SystemName : public StackSegment<SIZE_OF_SYSNAME>{
 public:
 	
 	SystemName(const ID& id, const Extension& ext);
+	SystemName(const ID& id);
 
 };
 

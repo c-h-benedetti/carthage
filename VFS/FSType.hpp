@@ -3,6 +3,7 @@
 
 #include <cinttypes>
 
+// IMPROVE: Add methods to check which flags are raised
 enum class FSType : uint8_t{
 	UNKNOWN,
 	REMOVED,

@@ -4,14 +4,20 @@
 #include <string>
 
 
-// IMPROVE: Check if we can make this block more complete
-static FSBlock file_system_default(){
+// IMPROVE: Update the content of this block along the implementation of new features
+static FSBlock file_system_default(const char* n){
 	FSBlock b;
 
 	b.content = 0;
 	b.id.randomize();
-	std::string name = "Data";
-	b.name.override(name.c_str(), name.size());
+
+	if (n){
+		b.name = n;
+	}
+	else{
+		b.name = "Data";
+	}
+
 	b.flag = FSType::ROOT;
 	b.icon = 1;
 
@@ -19,23 +25,28 @@ static FSBlock file_system_default(){
 }
 
 
-void FileSystem::new_vfs(){
+void FileSystem::new_vfs(const char* n){
 
+	// Creating the root of the VFS, the first block in the first segment.
 	BasicBuffer<sizeof(FSize) + sizeof(FSBlock) + sizeof(FSPos)> segment;
-	FSBlock block = file_system_default();
-	block.before_writing();
+	FSBlock block = file_system_default(n);
+	block.before_writting();
 	segment.add<FSize>(1).add<FSBlock>(block).add<FSPos>(0);
 
+	// Creating the Carthage's hidden directory.
 	Path p = this->user_root / CARTHAGE_DIR;
 	if (!fs::exists(p)){
 		fs::create_directory(p);
 	}
 
-	Path data = this->user_root / (const char*)&SystemName(block.id, Extension{});
+	// Creating the data's root according to the newly created block.
+	SystemName name(block.id);
+	Path data = this->user_root / name.c_str();
 	if (!fs::exists(data)){
 		fs::create_directory(data);
 	}
 
+	// Writing the new block in the VFS.
 	std::ofstream str(this->vfs_file, std::ios::out | std::ios::binary);
 	
 	if (str.is_open()){
@@ -43,28 +54,49 @@ void FileSystem::new_vfs(){
 		str.close();
 	}
 	else{
-		std::cerr << "Failed to create the new VFS" << std::endl;
+		BasicBuffer<128> msg(0);
+		msg.copy_from("Failed to create the VFS to: ").copy_from(this->vfs_file.c_str());
+		throw std::ios_base::failure(msg.c_str());
 	}
 }
 
 
-FileSystem::FileSystem(const Path& p, bool reset) : 
+void FileSystem::open(){
+	// Reloading the block from the VFS to check for updates or deletions.
+	this->current_obj->reload_from_vfs();
+	// Reloading content of the container.
+	this->current_obj->load();
+	// Stacking for previous() and next() features.
+	this->stack.push_back(FSObject(*(this->current_obj)));
+}
+
+
+FileSystem::FileSystem(const Path& p, bool reset, const char* n) : 
 	current_path(p),
 	user_root(p),
 	vfs_file(p / CARTHAGE_DIR / VFS_DESCRIPTOR)
 {
 
-	if (reset || !fs::exists(this->vfs_file)){
-		this->new_vfs();
+	if (!fs::exists(p)){
+		BasicBuffer<128> msg(0);
+		msg.copy_from("The path \"").copy_from(p.c_str()).copy_from("\" doesn't exist.");
+		throw std::invalid_argument(msg.c_str());
 	}
-	
+
+	if (reset || !fs::exists(this->vfs_file)){
+		this->new_vfs(n);
+	}
+
+	// Opening the first segment contained in the VFS file.
 	this->open_root();
 }
 
 
 void FileSystem::open_root(){
+	// The first segment is supposed to be constant in size.
 	BasicBuffer<sizeof(FSize) + sizeof(FSBlock) + sizeof(FSPos)> segment;
 
+	// Reading the first segment of the VFS.
 	std::ifstream str(this->vfs_file, std::ios::in | std::ios::binary);
 	
 	if (str.is_open()){
@@ -72,38 +104,43 @@ void FileSystem::open_root(){
 		str.close();
 	}
 	else{
-		std::cerr << "Failed to create the new VFS" << std::endl;
-		return;
+		BasicBuffer<128> msg(0);
+		msg.copy_from("Failed to open the VFS to: ").copy_from(this->vfs_file.c_str());
+		throw std::ios_base::failure(msg.c_str());
 	}
 
-	FSize size = 0;
-	FSPos next = 0;
+	// Retreiving the prefix, the block and the suffix of the segment.
+	FSize ssize = 0;
+	FSPos next_b = 0;
 	FSBlock block;
 
-	memcpy(&size, &segment, sizeof(FSize));
-	memcpy(&block, &segment + sizeof(FSize), sizeof(FSBlock));
-	memcpy(&next, &segment + sizeof(FSize) + sizeof(FSBlock), sizeof(FSPos));
+	BufferReader head(segment);
+	head.get<FSize>(ssize).get<FSBlock>(block).get<FSPos>(next_b);
 
 	block.after_reading();
 
-	if ((size != 1) || (next != 0) || (block.flag == FSType::REMOVED)){
-		std::cerr << "The format of the root is corrupted" << std::endl;
-		return;
+	// The root is presumed to be unique so: size == 1
+	// The root is the root (duh) so: next == 0
+	// The root in constant and can't be unstacked and should always be present (so the removed flag not raised).
+	if ((ssize != 1) || (next_b != 0) || (block.flag != FSType::ROOT)){
+		BasicBuffer<128> msg(0);
+		msg.copy_from("The root's block of the VFS seems to be corrupted.");
+		throw std::logic_error(msg.c_str());
 	}
 
-	this->current_obj = std::make_unique<Container>(new Folder{
+	this->current_obj = std::unique_ptr<Folder>(new Folder{
 		block,
 		sizeof(FSize), 
 		this
 	});
-	
+
 	this->current_path /= this->current_obj->path;
-	this->current_obj.load();
+	this->current_obj->load();
 }
 
 
 void FileSystem::change_directory(std::unique_ptr<Container>&& c){
-	this->current = std::move(c);
+	this->current_obj = std::move(c);
 }
 
 
@@ -116,14 +153,3 @@ void FileSystem::previous(){
 
 }
 
-
-void FileSystem::dispatch(const std::vector<FSObject>& segment){
-	this->folders.clear();
-	this->folders.reserve(this->block.nb_folders);
-
-	for(size_t i = 0 ; i < segment.size() ; i++){
-		if (segment[i].data().flag == FSType::FOLDER){
-			this->folders.push_back(Folder(segment[i]));
-		}
-	}
-}
