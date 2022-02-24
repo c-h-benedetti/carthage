@@ -5,6 +5,9 @@
 
 
 // IMPROVE: Update the content of this block along the implementation of new features
+/**
+ * Function returning the block every VFS starts with.
+ */
 static FSBlock file_system_default(const char* n){
 	FSBlock b;
 
@@ -18,13 +21,15 @@ static FSBlock file_system_default(const char* n){
 		b.name = "Data";
 	}
 
-	b.flag = FSType::ROOT;
-	b.icon = 1;
+	b.flag = pair_flags(FSType::ROOT, FSType::FOLDER);
 
 	return b;
 }
 
-
+/**
+ * Create a new empty VFS from scratch.
+ * Only the Carthage's hierarchy and a root are added (which is the minimal)
+ */
 void FileSystem::new_vfs(const char* n){
 
 	// Creating the root of the VFS, the first block in the first segment.
@@ -60,7 +65,10 @@ void FileSystem::new_vfs(const char* n){
 	}
 }
 
-
+// IMPROVE: [FileSystem] The building of the path should be performed by a virtual method FSObject::stack(). Because the Versionable objects have very specific behaviors.
+/**
+ * Method used when transitioning to a new current objects to refresh the target's block and fetch its content.
+ */
 void FileSystem::open(){
 	// Reloading the block from the VFS to check for updates or deletions.
 	this->current_obj->reload_from_vfs();
@@ -68,6 +76,7 @@ void FileSystem::open(){
 	this->current_obj->load();
 	// Stacking for previous() and next() features.
 	this->stack.push_back(FSObject(*(this->current_obj)));
+	this->current_path /= this->current_obj->path; // = To be replace = 
 }
 
 
@@ -91,7 +100,11 @@ FileSystem::FileSystem(const Path& p, bool reset, const char* n) :
 	this->open_root();
 }
 
-
+/**
+ * Method used to load the very first segment of a VFS.
+ * The first segment is constant in term of size.
+ * Its size is always of 1, and its next pointer is to 0.
+ */
 void FileSystem::open_root(){
 	// The first segment is supposed to be constant in size.
 	BasicBuffer<sizeof(FSize) + sizeof(FSBlock) + sizeof(FSPos)> segment;
@@ -122,7 +135,7 @@ void FileSystem::open_root(){
 	// The root is presumed to be unique so: size == 1
 	// The root is the root (duh) so: next == 0
 	// The root in constant and can't be unstacked and should always be present (so the removed flag not raised).
-	if ((ssize != 1) || (next_b != 0) || (block.flag != FSType::ROOT)){
+	if ((ssize != 1) || (next_b != 0) || (!removed_raised(block.flag))){
 		BasicBuffer<128> msg(0);
 		msg.copy_from("The root's block of the VFS seems to be corrupted.");
 		throw std::logic_error(msg.c_str());
@@ -138,7 +151,9 @@ void FileSystem::open_root(){
 	this->current_obj->load();
 }
 
-
+/**
+ * Change the content of the current object.
+ */
 void FileSystem::change_directory(std::unique_ptr<Container>&& c){
 	this->current_obj = std::move(c);
 }
@@ -153,3 +168,94 @@ void FileSystem::previous(){
 
 }
 
+static void recursive_hierarchy(size_t depth, const FSBlock& block, std::ifstream& vfs, std::ofstream& str){
+	BasicBuffer<2048> buffer(0);
+
+	if (depth >= 1){
+		for (size_t i = 0 ; i < depth - 1 ; i++){
+			buffer.copy_from("|   ");
+		}
+	}
+	if (depth > 0){
+		buffer.copy_from("+---");
+	}
+
+	if (removed_raised(block.flag)){
+		buffer.copy_from("<s>");
+	}
+
+	if (root_raised(block.flag)){
+		buffer.copy_from("<b>");	
+	}
+
+	if (folder_raised(block.flag)){
+		if (current_raised(block.flag)){
+			buffer.copy_from("<b><i>").copy_from("(FOL) ").copy_from("</i></b>").copy_from(block.name.c_str());
+		}
+		else if(version_raised(block.flag)){
+			buffer.copy_from("<i>").copy_from("(FOL) ").copy_from(block.name.c_str()).copy_from("</i>");
+		}
+		else{
+			buffer.copy_from("<b><i>").copy_from("(FOL) ").copy_from("</i></b>").copy_from(block.name.c_str());
+		}
+	}
+	else if(file_raised(block.flag)){
+		buffer.copy_from("<b><i>").copy_from("(FIL) ").copy_from("</i></b>").copy_from(block.name.c_str()).copy_from(" [").copy_from(block.extension.c_str()).copy_from("]");
+	}
+	else if(versionable_raised(block.flag)){
+		buffer.copy_from("<b><i>").copy_from("(VER) ").copy_from("</i></b>").copy_from(block.name.c_str());
+	}
+
+	if (root_raised(block.flag)){
+		buffer.copy_from("</b>");	
+	}
+
+	if (removed_raised(block.flag)){
+		buffer.copy_from("</s>");
+	}
+
+
+	buffer.copy_from("\n");
+
+	str.write(buffer.c_str(), strlen(buffer.c_str()));
+
+	if (block.content){
+		std::vector<FSBlock> blocks;
+		FSPos c_pos = block.content;
+		FSize size = 0;
+
+		while(c_pos){
+			vfs.seekg(c_pos);
+			vfs.read((char*)&size, sizeof(FSize));
+			FSBlock read[size];
+			blocks.reserve(blocks.size() + size);
+			vfs.read((char*)read, sizeof(FSBlock)*size);
+
+			for (size_t i = 0 ; i < size ; i++){
+				read[i].after_reading();
+				blocks.push_back(read[i]);
+			}
+
+			vfs.read((char*)&c_pos, sizeof(FSPos));
+		}
+
+		for(const FSBlock& blc : blocks){
+			recursive_hierarchy(depth+1, blc, vfs, str);
+		}
+	}
+}
+
+void FileSystem::make_hierarchy(const Path& out) const{
+	std::ofstream str(out, std::ios::out | std::ios::binary);
+	std::ifstream vfs(this->vfs_file, std::ios::in | std::ios::binary);
+
+	vfs.seekg(sizeof(FSize));
+	FSBlock block;
+	vfs.read((char*)&block, sizeof(FSBlock));
+	block.after_reading();
+
+	recursive_hierarchy(0, block, vfs, str);
+
+	str.close();
+	vfs.close();
+}

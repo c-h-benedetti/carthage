@@ -36,10 +36,16 @@ set(VFS_SRC
 	VFS/Folder.cpp 
 	VFS/Versionable.hpp 
 	VFS/Versionable.cpp 
-	VFS/Container.hpp 
+	VFS/Container.hpp
+	VFS/Container.tpp 
 	VFS/Container.cpp 
 	VFS/FileSystem.hpp 
 	VFS/FileSystem.cpp
+	VFS/arguments.hpp
+	VFS/arguments.cpp
+	VFS/arguments.tpp
+	VFS/arg_blocks.hpp
+	VFS/arg_blocks.cpp
 )
 
 set(ROOT_SRC

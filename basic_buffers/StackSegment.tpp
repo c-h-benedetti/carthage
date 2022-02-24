@@ -14,6 +14,14 @@ StackSegment<N>::StackSegment(const StackSegment<N>& b){
 	memcpy(this->buffer, b.buffer, N);
 }
 
+template <size_t N>
+bool StackSegment<N>::equals(const StackSegment<N>& s2) const{
+	size_t i = 0;
+	while ((i < N) && (this->buffer[i] == s2.buffer[i])){
+		i++;
+	}
+	return (i == N);
+}
 
 template <size_t N>
 StackSegment<N>::StackSegment(const void* c, const size_t& s){

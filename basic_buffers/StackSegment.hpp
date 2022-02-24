@@ -39,6 +39,7 @@ public:
 	
 	void nullify();
 	void override(const void* src, const size_t& s);
+	bool equals(const StackSegment<N>& s2) const;
 
 	void read_from(std::istream& s);
 	void write_to(std::ostream& o) const;
@@ -56,6 +57,10 @@ public:
 	inline const uint8_t* data() const{ return this->buffer; }
 };
 
+template <size_t N>
+inline bool operator==(const StackSegment<N>& s1, const StackSegment<N>& s2){
+	return s1.equals(s2);
+}
 
 #include "StackSegment.tpp"
 

@@ -1,0 +1,143 @@
+
+#page{
+	width: 100%;
+	position: absolute;
+	top: 82px;
+	height: calc(100% - 80px);
+	border-collapse: collapse;
+	overflow: hidden;
+	position: absolute;
+}
+
+#page tr{
+	height: 100%;
+	position: absolute;
+}
+
+
+#bandeau{
+	height: 80px;
+	width: 100%;
+	background-color: rgb(30, 32, 36);
+	position: absolute;
+	border-bottom: solid 3px white;
+}
+
+.search{
+	background-color: rgba(255, 255, 255, 0.05);
+	width: 600px;
+	border-radius: 3px;
+	font-family: "Oxygen";
+	left: 50%;
+	color: rgba(255, 255, 255, 0.2);
+	padding: 8px;
+	font-size: 1.1em;
+	margin-left: 50%;
+	transform: translate(-50%, 15px);
+	cursor: pointer;
+	font-style: italic;
+	border: solid 1px rgba(255, 255, 255, 0.5);
+}
+
+.ri-search-eye-line{
+	transform: translateY(3px);
+	display: inline-block;
+	font-size: 23px;
+	margin-right: 10px;
+}
+
+#left_block{
+	background-color: rgb(30, 32, 36);
+	/*border-right: solid 3px white;*/
+	width: 250px;
+	vertical-align: top;
+	padding-top: 55px;
+}
+
+#main_block{
+	background-color: rgb(30, 32, 36);
+	vertical-align: top;
+	text-align: center;
+	height: 100%;
+}
+
+.menu_item{
+	height: 36px;
+	width: 95%;
+	padding: 2px;
+	color: white;
+	margin-bottom: 10px;
+	border-bottom: solid 2px rgba(205, 24, 24, 0);
+	transition: 0.3s;
+}
+
+.connexion{
+	height: 36px;
+	width: 95%;
+	padding: 2px;
+	color: rgba(255, 255, 255, 0.3);
+	margin-bottom: 10px;
+	border-bottom: solid 2px rgba(205, 24, 24, 0);
+	position: absolute;
+	bottom: 0px;
+	font-variant: small-caps;
+	font-size: 1em;
+}
+
+.menu_item:hover{
+	border-bottom: solid 2px rgba(205, 24, 24, 1);
+	cursor: pointer;
+	transition: 0.3s;
+	color: #cd1818;
+	padding-left: 10px;
+}
+
+.menu_icon{
+	font-size: 1.8em;
+	transform: translateY(2px);
+	display: inline-block;
+	margin-left: 10px;
+}
+
+.menu_text{
+	font-size: 1.1em;
+	transform: translate(10px, -6px);
+	display: inline-block;
+	font-family: "Oxygen";
+}
+
+html, body{
+	margin: 0;
+	padding: 0;
+	font-family: "Roboto Slab";
+}
+
+.sort_and_display{
+	font-size: 1.4em;
+	margin-bottom: 25px;
+	text-align: right;
+	margin-top: 20px;
+	color: rgba(255, 255, 255, 0.85);
+	display: block;
+	width: 100%;
+}
+
+.disp_type{
+	display: inline-block;
+	padding-right: 10px;
+	margin-right: 6px;
+	border-right: solid 1px rgba(255, 255, 255, 0.6);
+}
+
+.sort_type{
+	display: inline-block;
+	font-family: "Oxygen";
+}
+
+.sort_text{
+	display: inline-block;
+	transform: translateY(-3px);
+	font-weight: lighter;
+	font-size: 0.85em;
+	margin-right: 50px;
+}

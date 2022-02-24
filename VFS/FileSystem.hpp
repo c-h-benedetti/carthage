@@ -1,7 +1,8 @@
 #ifndef VFS_FILE_SYSTEM_HPP_INCLUDED
 #define VFS_FILE_SYSTEM_HPP_INCLUDED
 
-#include "Container.hpp"
+#include "Folder.hpp"
+#include "Versionable.hpp"
 #include <memory>
 
 class FileSystem {
@@ -32,8 +33,32 @@ public:
 	inline const Path& vfs_path() const{ return this->vfs_file; }
 	inline const std::unique_ptr<Container>& current(){ return this->current_obj; }
 
+	inline const Path& current_syspath(){ return this->current_path; }
+
+	inline FSType base_class() const{ return this->current_obj->data().flag; }
+
+	inline Folder* get_folder() { 
+		if ((this->base_class() == FSType::FOLDER) || (this->base_class() == FSType::ROOT)){
+			return (Folder*)this->current_obj.get();
+		}
+		else{
+			return nullptr;
+		}
+	}
+
+	inline Versionable* get_versionable() { 
+		if (this->base_class() == FSType::VERSIONABLE){
+			return (Versionable*)this->current_obj.get();
+		}
+		else{
+			return nullptr;
+		}
+	}
+
+	// IMPROVE: Must implement previous() and next() methods in FileSystem.
 	void next();
 	void previous();
+	void make_hierarchy(const Path& out) const;
 
 };
 
