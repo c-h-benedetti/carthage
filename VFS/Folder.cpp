@@ -2,55 +2,96 @@
 #include "FileSystem.hpp"
 #include <fstream>
 
-void Folder::open(){
-	this->refer_to->change_directory(std::unique_ptr<Folder>(new Folder(*this)));
-	this->refer_to->open();
-}
-
+// IMPROVE: [Folder] Implement the join() method to build the path in the FileSystem.
 // IMPROVE: [Folder] Could the browsing be optimized? If we use a state machine in FS, we don't need this method.
-FSObject* Folder::at(size_t i){
-	if (i < folders.size()){
-		return &(this->folders[i]);
-	}
-	i -= folders.size();
-	if (i < files.size()){
-		return &(this->files[i]);
-	}
-	i -= files.size();
-	return &(this->versionables[i]);
-}
 
+// DEBUG: [Folder] In dispatch, check that the values nb_x match the number of elements effectively seen in the loop.
 
-size_t Folder::size() const{
-	return this->folders.size() + this->files.size() + this->versionables.size();
-}
-
-
+/**
+ * Filters the content received in segment.
+ */
 void Folder::dispatch(const std::vector<FSObject>& segment){
-	this->folders.clear();
-	this->folders.reserve(this->block.nb_folders);
+	this->content.clear();
+	this->content.reserve(this->block.nb_folders + this->block.nb_files + this->block.nb_versionables);
 
-	this->files.clear();
-	this->files.reserve(this->block.nb_files);
-
-	this->versionables.clear();
-	this->versionables.reserve(this->block.nb_versionables);
-
-
-	for(size_t i = 0 ; i < segment.size() ; i++){
-		if (file_raised(segment[i].data().flag)){
-			this->files.push_back(File(segment[i]));
-		}
-		else if(folder_raised(segment[i].data().flag)){
-			this->folders.push_back(Folder(segment[i]));
-		}
-		else if(versionable_raised(segment[i].data().flag)){
-			this->versionables.push_back(Versionable(segment[i]));
+	for(const FSObject& obj : segment){
+		if (!removed_raised(obj.data().flag)){
+			this->content.push_back(obj);
 		}
 	}
 }
 
 
+/**
+ * Creating a new file
+ */
+void Folder::new_file(const ArgsNewFile& args){
+	FSBlock b;
+	b.id.randomize();
+	b.name = args.name.value();
+	b.icon = args.icon.value();
+	b.extension = args.extension.value();
+	b.flag = FSType::FILE;
+	b.parent = this->block_pos;
+
+	std::function<FSObject(const Path&, const FSPos&)> instanciating = [&](const Path& abs_path, const FSPos& insert){
+		std::ofstream n_fi(abs_path, std::ios::out);
+		n_fi.close();
+
+		FSObject fi(
+			this->refer_to,
+			b, 
+			insert+sizeof(FSize)
+		);
+		b.time = fs::last_write_time(abs_path);
+		this->block.nb_files++;
+
+		return fi;
+	};
+
+	this->create_element<1>(
+		b,
+		instanciating,
+		this->content
+	);
+}
+
+
+/**
+ * Creating a new folder
+ */
+void Folder::new_folder(const ArgsNewFolder& args){
+	FSBlock b;
+	b.id.randomize();
+	b.name = args.name.value();
+	b.icon = args.icon.value();
+	b.flag = FSType::FOLDER;
+	b.parent = this->block_pos;
+
+	std::function<FSObject(const Path&, const FSPos&)> instanciating = [&](const Path& abs_path, const FSPos& insert){
+		fs::create_directory(abs_path);
+		FSObject fdr(
+			this->refer_to,
+			b, 
+			insert+sizeof(FSize) 
+		);
+		b.time = fs::last_write_time(abs_path);
+		this->block.nb_folders++;
+
+		return fdr;
+	};
+
+	this->create_element<1>(
+		b,
+		instanciating,
+		this->content
+	);
+}
+
+
+/**
+ * Creating a new versionable
+ */
 void Folder::new_versionable(const ArgsNewVersionable& args){
 
 	FSBlock b_v;
@@ -66,7 +107,7 @@ void Folder::new_versionable(const ArgsNewVersionable& args){
 	b_c.icon = 0;
 	b_c.flag = pair_flags(FSType::CURRENT, FSType::FOLDER);
 
-	std::function<Versionable(const Path&, const FSPos&)> instanciating = [&](const Path& abs_path, const FSPos& insert){
+	std::function<FSObject(const Path&, const FSPos&)> instanciating = [&](const Path& abs_path, const FSPos& insert){
 		
 		b_v.content = insert + sizeof(FSize) + sizeof(FSBlock) + sizeof(FSPos);
 
@@ -79,103 +120,41 @@ void Folder::new_versionable(const ArgsNewVersionable& args){
 		b_c.parent = insert + sizeof(FSize);
 		b_v.time = fs::last_write_time(c_path);
 
-		Versionable ver(
+		FSObject ver(
+			this->refer_to,
 			b_v,
-			insert+sizeof(FSize),
-			this->refer_to
+			insert+sizeof(FSize)
 		);
 
-		Folder fdr(
+		FSObject fdr(
+			this->refer_to,
 			b_c, 
-			insert + sizeof(FSize) + sizeof(FSBlock) + sizeof(FSPos) + sizeof(FSize), 
-			this->refer_to
+			insert + sizeof(FSize) + sizeof(FSBlock) + sizeof(FSPos) + sizeof(FSize)
 		);
 
 
 		// 4. Updating values in objects
 		this->block.nb_versionables++;
-		fdr.refresh_vfs();
+		fdr.override_vfs();
 
 		return ver;
 	};
 
-	this->create_element<Versionable, 2>(
-		args.name.value(),
-		Extension(0),
+	this->create_element<2>(
 		b_v,
 		instanciating,
-		this->versionables
+		this->content
 	);
 }
 
 
-void Folder::new_folder(const ArgsNewFolder& args){
-	FSBlock b;
-	b.id.randomize();
-	b.name = args.name.value();
-	b.icon = args.icon.value();
-	b.flag = FSType::FOLDER;
-	b.parent = this->block_pos;
-
-	std::function<Folder(const Path&, const FSPos&)> instanciating = [&](const Path& abs_path, const FSPos& insert){
-		fs::create_directory(abs_path);
-		Folder fdr(
-			b, 
-			insert+sizeof(FSize), 
-			this->refer_to
-		);
-		b.time = fs::last_write_time(abs_path);
-		this->block.nb_folders++;
-
-		return fdr;
-	};
-
-	this->create_element<Folder, 1>(
-		args.name.value(),
-		Extension(0),
-		b,
-		instanciating,
-		this->folders
-	);
-}
+// # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+// #       CONSTRUCTORS                                                                      #
+// # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 
-void Folder::new_file(const ArgsNewFile& args){
-	FSBlock b;
-	b.id.randomize();
-	b.name = args.name.value();
-	b.icon = args.icon.value();
-	b.extension = args.extension.value();
-	b.flag = FSType::FILE;
-	b.parent = this->block_pos;
-
-	std::function<File(const Path&, const FSPos&)> instanciating = [&](const Path& abs_path, const FSPos& insert){
-		std::ofstream n_fi(abs_path, std::ios::out);
-		n_fi.close();
-
-		File fi(
-			b, 
-			insert+sizeof(FSize), 
-			this->refer_to
-		);
-		b.time = fs::last_write_time(abs_path);
-		this->block.nb_files++;
-
-		return fi;
-	};
-
-	this->create_element<File, 1>(
-		args.name.value(),
-		args.extension.value(),
-		b,
-		instanciating,
-		this->files
-	);
-}
-
-
-Folder::Folder(FileSystem* fs): Container(fs){}
+Folder::Folder(FileSystem& fs): Container(fs){}
 
 Folder::Folder(const FSObject& obj): Container(obj){}
 
-Folder::Folder(const FSBlock& bck, const FSPos& pos, FileSystem* fs): Container(bck, pos, fs){}
+Folder::Folder(FileSystem& fs, const FSBlock& bck, const FSPos& pos): Container(fs, bck, pos){}

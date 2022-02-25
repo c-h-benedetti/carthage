@@ -4,24 +4,51 @@
 #include <functional>
 #include <vector>
 
-template <class K, class D>
-class Map{
+template <typename T>
+class TypeToIndex{
+public:
+	const size_t index;
+	TypeToIndex(const size_t& i): index(i);
+};
 
-	std::vector<K> keys;
-	std::vector<D> values;
-	std::vector<size_t> indices;
-	std::function<bool(const K&, const K&)> comparison; // K1 < K2
+
+template <typename T>
+class IndexedData{
+
+	std::vector<T>& data;
+	std::vector<FSize> indices;
+	std::function<bool(const T& t1, const T& t2)> t1_inf_to_t2;
+	std::function<bool(const FSize& f1, const FSize& f2)> comparison = [&](const FSize& f1, const FSize& f2){
+		return this->t1_inf_to_t2(this->data[f1], this->data[f2]);
+	};
 
 public:
 
-	Map() = delete;
-	Map(std::vector<K>& k, std::vector<D> d, std::function<bool(const K&, const K&)> c);
+	void update();
 
-	inline size_t size() const{ return this->keys.size(); }
-	
-	void const_for_each(std::function<void(const size_t&, const K&, const D&)> f) const;
-	void for_each(std::function<void(const size_t&, const K&, D&)> f);
+	IndexedData() = delete;
+	IndexedData(std::vector<T>& vec, const std::function<bool(const T& t1, const T& t2)>& f): data(vec), t1_inf_to_t2(f){
+		this->update();
+	}
 };
+
+
+template <typename T>
+class Map{
+
+protected:
+
+	std::vector<T> data;
+	std::vector<IndexedData<T>> sorted_data;
+
+	const TypeToIndex<int> index_int
+
+};
+
+
+/**
+ * !!! Define an interface for the map anyway !!!
+ */
 
 #include "Map.tpp"
 

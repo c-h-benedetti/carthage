@@ -39,6 +39,10 @@ autre software pour les transformer en un .mp4.
 */
 
 
+// IMPROVE: [General] Instead of sending errors to std::cerr, we should use a global stream for logs.
+// IMPROVE: [General] Make functions to manipulate the VFS instead of manipulation des std::fstream all the time. These functions could at least handle the endianness of the size of the segment and the next pointer.
+// IMPROVE: [General] Make a debug mode with preprocessor blocks.
+
 void test_vfs_1(){
 
 	FileSystem vfs("/tmp", true, "Project");

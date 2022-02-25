@@ -8,39 +8,29 @@ class FileSystem;
 
 class FSObject{
 
-	friend class FileSystem;
-
 protected: 
-	/// System name of this object (includes extension if it is a File).
-	Path path;
-	/// Represents selection for batch operations
-	bool selected = false;
-	/// Position of the block in the VFS.
-	FSPos block_pos = 0;
-	/// Raw data block.
-	FSBlock block;
-	// IMPROVE: [FSObject] Make the FileSystem pointer a reference instead, since we can initialize it from the very begining.
-	FileSystem* refer_to = nullptr;
-
-protected:
-
-	// IMPROVE: [FSObject] The load() method should be purely virtual, it doesn't have implementation.
-	virtual void load(){}
+	
+	Path        system_name;   /// System name of this object (includes extension if it is a File).
+	FSPos       block_pos = 0; /// Position of the block in the VFS.
+	FSBlock     block;         /// Raw data block.
+	FileSystem& refer_to;      /// Reference of the FileSystem that generated this object.
 
 public:
 
-	inline void toggle_select(){ this->selected = !this->selected; }
-	inline void set_selection(const bool& b){ this->selected = b; }
+	virtual void load(){}          /// Describes the steps to load the element.
+	virtual void join(Path& p){}   /// What to add to the global path to reach this element on the system.
+	virtual void unjoin(Path& p){} /// What to remove from global path when unstacking this object
+
+	int reload_from_vfs();    /// Fetch this block from the VFS and overrides FSObject::block.
+	int override_vfs() const; /// Write FSObject::block into the VFS at the position FSObject::block_pos.
+
 	inline const FSBlock& data() const{ return this->block; }
 
-	// IMPROVE: [FSObject] The open() method should be purely virtual, it doesn't have implementation.
-	virtual void open(){}
-	void reload_from_vfs();
-	void refresh_vfs() const;
-
 	FSObject() = delete;
-	FSObject(FileSystem* fs);
-	FSObject(const FSBlock& bck, const FSPos& pos, FileSystem* fs);
+	FSObject(FileSystem& fs);
+	FSObject(FileSystem& fs, const FSBlock& bck, const FSPos& pos);
+
+	friend class FileSystem;
 
 };
 

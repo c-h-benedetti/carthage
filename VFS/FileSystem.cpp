@@ -1,26 +1,19 @@
 #include "FileSystem.hpp"
-#include "Folder.hpp"
+#include "File.hpp"
+#include "Versionable.hpp"
 #include <fstream>
 #include <string>
 
-
 // IMPROVE: Update the content of this block along the implementation of new features
+
 /**
  * Function returning the block every VFS starts with.
  */
 static FSBlock file_system_default(const char* n){
 	FSBlock b;
-
 	b.content = 0;
 	b.id.randomize();
-
-	if (n){
-		b.name = n;
-	}
-	else{
-		b.name = "Data";
-	}
-
+	b.name = (n) ? (n) : ("Data");
 	b.flag = pair_flags(FSType::ROOT, FSType::FOLDER);
 
 	return b;
@@ -76,9 +69,40 @@ void FileSystem::open(){
 	this->current_obj->load();
 	// Stacking for previous() and next() features.
 	this->stack.push_back(FSObject(*(this->current_obj)));
-	this->current_path /= this->current_obj->path; // = To be replace = 
+
+	this->current_obj.join(this->current_path);
 }
 
+// IMPROVE: [FileSystem] When maps will be implemented, pass an ID rather than an object.
+void FileSystem::open(const FSObject& obj){
+
+	// IMPROVE: [FileSystem] Is reloading useful? Check deletion. Handle errors.
+	this->current_obj->reload_from_vfs();
+
+	FSType flag = obj.data().flag;
+
+	// IMPROVE: [FileSystem] Files opening handling is not very clean.
+
+	if (file_raised(flag)){
+		File file(obj);
+		file.load();
+		return;
+	}
+	else if(folder_raised(flag)){
+		this->current_obj = std::unique_ptr<Container>(new Folder(obj));
+	}
+	else if(versionable_raised(flag)){
+		this->current_obj = std::unique_ptr<Container>(new Versionable(obj));
+	}
+	else{
+		// IMPROVE: [FileSystem] Improve error handling if the data type is unknown.
+		return;
+	}
+
+	this->stack.push_back(obj);
+	this->current_obj->load();
+	this->current_obj->join(this->current_path);
+}
 
 FileSystem::FileSystem(const Path& p, bool reset, const char* n) : 
 	current_path(p),
@@ -149,13 +173,6 @@ void FileSystem::open_root(){
 
 	this->current_path /= this->current_obj->path;
 	this->current_obj->load();
-}
-
-/**
- * Change the content of the current object.
- */
-void FileSystem::change_directory(std::unique_ptr<Container>&& c){
-	this->current_obj = std::move(c);
 }
 
 

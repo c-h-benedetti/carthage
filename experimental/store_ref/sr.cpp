@@ -1,6 +1,8 @@
 #include <iostream>
 #include <vector>
 
+
+
 class A{
 	
 	std::vector<int>& vec;
@@ -45,13 +47,24 @@ void fx(const A& a){
 
 }
 
+class C;
+
+class D{
+
+	C& c;
+
+public:
+
+	D(C& cc): c(cc){}
+};
+
 int main(int argc, char* argv[], char* env[]){
 
-	std::vector<int> mv = {1, 2, 3, 4, 5, 6};
-	std::vector<A> as = {A(mv), A(mv), A(mv), A(mv)};
-	std::vector<B> bs = {B{mv}, B{mv}, B{mv}, B{mv}};
+	// std::vector<int> mv = {1, 2, 3, 4, 5, 6};
+	// std::vector<A> as = {A(mv), A(mv), A(mv), A(mv)};
+	// std::vector<B> bs = {B{mv}, B{mv}, B{mv}, B{mv}};
 
-	function(bs.data(), bs.size());
+	// function(bs.data(), bs.size());
 
 	return 0;
 }

@@ -1,42 +1,40 @@
 #ifndef VFS_FOLDER_HPP_INCLUDED
 #define VFS_FOLDER_HPP_INCLUDED
 
-#include "File.hpp"
-#include "Versionable.hpp"
+#include "Container.hpp"
+
+// IMPROVE: [Folder] Make iterators to iterate through one type of flag in the content.
 
 class Folder : public Container{
 
-	friend class FileSystem;
+protected:
 
-	std::vector<Folder> folders;
-	std::vector<File> files;
-	std::vector<Versionable> versionables;
+	std::vector<FSObject> content;
+
+protected:
 
 	void dispatch(const std::vector<FSObject>& segment) override;
 
 public:
 
-	inline std::vector<File>& get_files(){ return this->files; }
-	inline std::vector<Folder>& get_folders(){ return this->folders; }
-	inline std::vector<Versionable>& get_versionables(){ return this->versionables; }
+	inline size_t size() const override{ return this->content.size(); }
+	inline const FSObject& at(const size_t& i) const override{ return this->content[i]; }
 
-	void open() override;
-	FSObject* at(size_t i) override;
-	size_t size() const override;
+	bool accept_files() const override{ return true; }
+	bool accept_folders() const override{ return true; }
+	// IMPROVE: [Folder] Modify the code that blocks the creation of a Versionable in a Versionable.
+	bool accept_versionables() const override{ return true; }
 
-	bool accept_files() const override{return true;}
 	void new_file(const ArgsNewFile& args) override;
-
-	bool accept_folders() const override{return true;}
 	void new_folder(const ArgsNewFolder& args) override;
-
-	bool accept_versionables() const override{return true;}
 	void new_versionable(const ArgsNewVersionable& fs) override;
 
-	Folder() = default;
-	Folder(FileSystem* fs);
+	Folder() = delete;
+	Folder(FileSystem& fs);
 	Folder(const FSObject& obj);
-	Folder(const FSBlock& bck, const FSPos& pos, FileSystem* fs);
+	Folder(FileSystem& fs, const FSBlock& bck, const FSPos& pos);
+
+	friend class FileSystem;
 
 };
 
