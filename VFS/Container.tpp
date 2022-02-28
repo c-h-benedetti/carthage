@@ -62,6 +62,10 @@ int Container::create_element(FSBlock& blc, std::function<FSObject(const Path&, 
 
 	int code = 0;
 
+	// IMPROVE: [Container] Handle linking error codes.
+	this->linking_segment(insert);
+	collection.push_back(obj);
+
 	if (this->override_vfs()){
 		std::cerr << "Failed to update VFS to override this" << std::endl;
 		code |= (1 << 1);
@@ -71,8 +75,6 @@ int Container::create_element(FSBlock& blc, std::function<FSObject(const Path&, 
 		std::cerr << "Failed to update VFS to override new object's segment" << std::endl;
 		code |= (1 << 2);
 	}
-
-	collection.push_back(obj);
 
 	return code;
 }

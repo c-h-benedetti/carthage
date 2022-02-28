@@ -10,6 +10,7 @@ class FileSystem {
 	std::unique_ptr<Container> current_obj = nullptr;
 	std::vector<FSObject> stack;
 	Path current_path;
+	size_t head = 0;
 	const Path user_root;
 	const Path vfs_file;
 
@@ -17,7 +18,6 @@ private:
 
 	void open_root();
 	void new_vfs(const char* n);
-	void make_hierarchy(const Path& out) const;
 
 public:
 
@@ -26,10 +26,15 @@ public:
 	inline const Path& vfs_path() const{ return this->vfs_file; }
 	inline const Path& current_syspath(){ return this->current_path; }
 	inline FSType base_class() const{ return this->current_obj->data().flag; }
+	void make_hierarchy(const Path& out) const;
 
 	// IMPROVE: Must implement previous() and next() methods in FileSystem.
 	void next();
 	void previous();
+
+	inline std::unique_ptr<Container>& current(){ return this->current_obj; }
+	inline Folder* folder() { return (folder_raised(this->current_obj->data().flag)) ? ((Folder*)this->current_obj.get()) : (nullptr); }
+	inline Versionable* versionable() { return (versionable_raised(this->current_obj->data().flag)) ? ((Versionable*)this->current_obj.get()) : (nullptr); }
 
 	FileSystem() = delete;
 	FileSystem(const Path& p, bool reset=false, const char* n=nullptr);

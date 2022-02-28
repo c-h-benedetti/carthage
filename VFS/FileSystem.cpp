@@ -46,7 +46,7 @@ void FileSystem::new_vfs(const char* n){
 
 	// Writing the new block in the VFS.
 	std::ofstream str(this->vfs_file, std::ios::out | std::ios::binary);
-	
+
 	if (str.is_open()){
 		segment.write_to(str);
 		str.close();
@@ -58,22 +58,8 @@ void FileSystem::new_vfs(const char* n){
 	}
 }
 
-// IMPROVE: [FileSystem] The building of the path should be performed by a virtual method FSObject::stack(). Because the Versionable objects have very specific behaviors.
-/**
- * Method used when transitioning to a new current objects to refresh the target's block and fetch its content.
- */
-void FileSystem::open(){
-	// Reloading the block from the VFS to check for updates or deletions.
-	this->current_obj->reload_from_vfs();
-	// Reloading content of the container.
-	this->current_obj->load();
-	// Stacking for previous() and next() features.
-	this->stack.push_back(FSObject(*(this->current_obj)));
 
-	this->current_obj.join(this->current_path);
-}
-
-// IMPROVE: [FileSystem] When maps will be implemented, pass an ID rather than an object.
+// IMPROVE: [FileSystem] When maps will be implemented, pass an ID rather than an object. An index could also be used.
 void FileSystem::open(const FSObject& obj){
 
 	// IMPROVE: [FileSystem] Is reloading useful? Check deletion. Handle errors.
@@ -95,14 +81,73 @@ void FileSystem::open(const FSObject& obj){
 		this->current_obj = std::unique_ptr<Container>(new Versionable(obj));
 	}
 	else{
-		// IMPROVE: [FileSystem] Improve error handling if the data type is unknown.
+		// IMPROVE: [FileSystem] Improve error handling if the data type is unknown. Find a way to cancel operation to leave in stable state.
 		return;
 	}
 
+	if (this->head != this->stack.size() - 1){
+		this->stack = std::vector<FSObject>(this->stack.begin(), this->stack.begin() + head + 1);
+	}
+
+	this->current_obj->reload_from_vfs();
 	this->stack.push_back(obj);
+	this->head = this->stack.size() - 1;
 	this->current_obj->load();
 	this->current_obj->join(this->current_path);
 }
+
+// IMPROVE: [FileSystem] Refactorize the code between open(), previous() & next().
+
+void FileSystem::next(){
+	if (this->head < this->stack.size() - 1){
+
+		this->head++;
+		const FSObject& obj = this->stack[this->head];
+		FSType flag = obj.data().flag;
+
+		if (folder_raised(flag)){
+			this->current_obj = std::unique_ptr<Container>(new Folder(obj));
+		}
+		else if (versionable_raised(flag)){
+			this->current_obj = std::unique_ptr<Container>(new Versionable(obj));
+		}
+		else{
+			// IMPROVE: [FileSystem] Improve error handling if the data type is unknown. Find a way to cancel operation to leave in stable state.
+			return;
+		}
+
+		this->current_obj->reload_from_vfs();
+		this->current_obj->load();
+		this->current_obj->join(this->current_path);
+	}
+}
+
+// DEBUG: [General] Make a verbose mode with preprocessor blocks.
+
+void FileSystem::previous(){
+	if (this->head > 0){
+
+		this->head--;
+		const FSObject& obj = this->stack[this->head];
+		FSType flag = obj.data().flag;
+
+		if (folder_raised(flag)){
+			this->current_obj = std::unique_ptr<Container>(new Folder(obj));
+		}
+		else if (versionable_raised(flag)){
+			this->current_obj = std::unique_ptr<Container>(new Versionable(obj));
+		}
+		else{
+			// IMPROVE: [FileSystem] Improve error handling if the data type is unknown. Find a way to cancel operation to leave in stable state.
+			return;
+		}
+
+		this->current_obj->reload_from_vfs();
+		this->current_obj->load();
+		this->current_obj->unjoin(this->current_path);
+	}
+}
+
 
 FileSystem::FileSystem(const Path& p, bool reset, const char* n) : 
 	current_path(p),
@@ -110,6 +155,7 @@ FileSystem::FileSystem(const Path& p, bool reset, const char* n) :
 	vfs_file(p / CARTHAGE_DIR / VFS_DESCRIPTOR)
 {
 
+	// If the user-provided directory doesn't exist.
 	if (!fs::exists(p)){
 		BasicBuffer<128> msg(0);
 		msg.copy_from("The path \"").copy_from(p.c_str()).copy_from("\" doesn't exist.");
@@ -124,113 +170,142 @@ FileSystem::FileSystem(const Path& p, bool reset, const char* n) :
 	this->open_root();
 }
 
+// DEBUG: [FSBlock] Check why calling constructor Name{0} or Extension{0} makes a segmentation fault.
+
 /**
  * Method used to load the very first segment of a VFS.
  * The first segment is constant in term of size.
  * Its size is always of 1, and its next pointer is to 0.
  */
 void FileSystem::open_root(){
-	// The first segment is supposed to be constant in size.
-	BasicBuffer<sizeof(FSize) + sizeof(FSBlock) + sizeof(FSPos)> segment;
+	// IMPROVE: [FileSystem] Remplacer "sizeof(FSize)" par une variable de préprocesseur au cas où l'architecture change.
+	this->current_obj = std::unique_ptr<Folder>(new Folder{
+		*this,
+		FSBlock(),
+		sizeof(FSize)
+	});
 
-	// Reading the first segment of the VFS.
-	std::ifstream str(this->vfs_file, std::ios::in | std::ios::binary);
-	
-	if (str.is_open()){
-		segment.read_from(str);
-		str.close();
-	}
-	else{
+	this->current_obj->reload_from_vfs();
+
+	if (removed_raised(this->current_obj->data().flag)){
 		BasicBuffer<128> msg(0);
-		msg.copy_from("Failed to open the VFS to: ").copy_from(this->vfs_file.c_str());
-		throw std::ios_base::failure(msg.c_str());
-	}
-
-	// Retreiving the prefix, the block and the suffix of the segment.
-	FSize ssize = 0;
-	FSPos next_b = 0;
-	FSBlock block;
-
-	BufferReader head(segment);
-	head.get<FSize>(ssize).get<FSBlock>(block).get<FSPos>(next_b);
-
-	block.after_reading();
-
-	// The root is presumed to be unique so: size == 1
-	// The root is the root (duh) so: next == 0
-	// The root in constant and can't be unstacked and should always be present (so the removed flag not raised).
-	if ((ssize != 1) || (next_b != 0) || (!removed_raised(block.flag))){
-		BasicBuffer<128> msg(0);
-		msg.copy_from("The root's block of the VFS seems to be corrupted.");
+		msg.copy_from("The root block of the VFS seems to be corrupted.");
 		throw std::logic_error(msg.c_str());
 	}
 
-	this->current_obj = std::unique_ptr<Folder>(new Folder{
-		block,
-		sizeof(FSize), 
-		this
-	});
-
-	this->current_path /= this->current_obj->path;
+	this->stack.push_back(FSObject(*this->current_obj));
+	this->current_obj->join(this->current_path);
 	this->current_obj->load();
 }
 
 
-void FileSystem::next(){
-
-}
-
-
-void FileSystem::previous(){
-
-}
-
 static void recursive_hierarchy(size_t depth, const FSBlock& block, std::ifstream& vfs, std::ofstream& str){
 	BasicBuffer<2048> buffer(0);
 
+	// Opening the first tag containing the whole line.
+	buffer.copy_from("<p class='line");
+
+	if (root_raised(block.flag)){
+		buffer.copy_from(" ROOT");
+	}
+	if (removed_raised(block.flag)){
+		buffer.copy_from(" REMOVED");
+	}
+	if (file_raised(block.flag)){
+		buffer.copy_from(" FILE");
+	}
+	if (folder_raised(block.flag)){
+		buffer.copy_from(" FOLDER");
+	}
+	if (versionable_raised(block.flag)){
+		buffer.copy_from(" VERSIONABLE");
+	}
+	if (current_raised(block.flag)){
+		buffer.copy_from(" CURRENT");
+	}
+	if (version_raised(block.flag)){
+		buffer.copy_from(" VERSION");
+	}
+	buffer.copy_from("'>");
+
+	// Characters used to represent the hierarchy in theur own span
+	buffer.copy_from("<span class='shift'>");
 	if (depth >= 1){
 		for (size_t i = 0 ; i < depth - 1 ; i++){
-			buffer.copy_from("|   ");
+			buffer.copy_from("&#x2502;&nbsp;&nbsp;&nbsp;");
 		}
 	}
 	if (depth > 0){
-		buffer.copy_from("+---");
+		buffer.copy_from("&#x251C;&#x2500;&#x2500; ");
 	}
+	buffer.copy_from("</span>");
 
-	if (removed_raised(block.flag)){
-		buffer.copy_from("<s>");
+	// Data representing the block
+	buffer.copy_from("<span class='data'>");
+
+	buffer.copy_from(block.name.c_str());
+
+	if (file_raised(block.flag)){
+		buffer.copy_from(" (").copy_from(block.extension.c_str()).copy_from(")");
 	}
+	if (folder_raised(block.flag) || versionable_raised(block.flag)){
+		// Insert the formated number of elements.
+	}
+	buffer.copy_from("</span>");
+
+	// Flag representing the type of the item.
+	buffer.copy_from("<span class='hint'>");
+	buffer.copy_from("  [");
 
 	if (root_raised(block.flag)){
-		buffer.copy_from("<b>");	
+		buffer.copy_from("R");
 	}
-
+	else{
+		buffer.copy_from(".");
+	}
+	if (removed_raised(block.flag)){
+		buffer.copy_from("X");
+	}
+	else{
+		buffer.copy_from(".");
+	}
+	if (file_raised(block.flag)){
+		buffer.copy_from("f");
+	}
+	else{
+		buffer.copy_from(".");
+	}
 	if (folder_raised(block.flag)){
-		if (current_raised(block.flag)){
-			buffer.copy_from("<b><i>").copy_from("(FOL) ").copy_from("</i></b>").copy_from(block.name.c_str());
-		}
-		else if(version_raised(block.flag)){
-			buffer.copy_from("<i>").copy_from("(FOL) ").copy_from(block.name.c_str()).copy_from("</i>");
-		}
-		else{
-			buffer.copy_from("<b><i>").copy_from("(FOL) ").copy_from("</i></b>").copy_from(block.name.c_str());
-		}
+		buffer.copy_from("F");
 	}
-	else if(file_raised(block.flag)){
-		buffer.copy_from("<b><i>").copy_from("(FIL) ").copy_from("</i></b>").copy_from(block.name.c_str()).copy_from(" [").copy_from(block.extension.c_str()).copy_from("]");
+	else{
+		buffer.copy_from(".");
 	}
-	else if(versionable_raised(block.flag)){
-		buffer.copy_from("<b><i>").copy_from("(VER) ").copy_from("</i></b>").copy_from(block.name.c_str());
+	if (versionable_raised(block.flag)){
+		buffer.copy_from("V");
+	}
+	else{
+		buffer.copy_from(".");
+	}
+	if (current_raised(block.flag)){
+		buffer.copy_from("C");
+	}
+	else{
+		buffer.copy_from(".");
+	}
+	if (version_raised(block.flag)){
+		buffer.copy_from("v");
+	}
+	else{
+		buffer.copy_from(".");
 	}
 
-	if (root_raised(block.flag)){
-		buffer.copy_from("</b>");	
-	}
+	buffer.copy_from("]");
+	buffer.copy_from("</span>");
 
-	if (removed_raised(block.flag)){
-		buffer.copy_from("</s>");
-	}
+	buffer.copy_from("</span>");
 
+	buffer.copy_from("</p>");
 
 	buffer.copy_from("\n");
 
@@ -266,12 +341,27 @@ void FileSystem::make_hierarchy(const Path& out) const{
 	std::ofstream str(out, std::ios::out | std::ios::binary);
 	std::ifstream vfs(this->vfs_file, std::ios::in | std::ios::binary);
 
+	BasicBuffer<4096> buffer(0);
+	BasicBuffer<4096> buffer2(0);
+
+	buffer.copy_from("<!doctype HTML>\n");
+	buffer.copy_from("<html>\n");
+	buffer.copy_from("<head>\n");
+	buffer.copy_from("    <link rel='stylesheet' type='text/css' href='vfs.css'>\n");
+	buffer.copy_from("</head>\n");
+	buffer.copy_from("<body>\n");
+	buffer.write_to(str);
+
 	vfs.seekg(sizeof(FSize));
 	FSBlock block;
 	vfs.read((char*)&block, sizeof(FSBlock));
 	block.after_reading();
 
 	recursive_hierarchy(0, block, vfs, str);
+
+	buffer2.copy_from("</body>\n");
+	buffer2.copy_from("</html>\n");
+	buffer2.write_to(str);
 
 	str.close();
 	vfs.close();

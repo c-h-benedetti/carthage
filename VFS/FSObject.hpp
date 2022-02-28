@@ -25,6 +25,7 @@ public:
 	int override_vfs() const; /// Write FSObject::block into the VFS at the position FSObject::block_pos.
 
 	inline const FSBlock& data() const{ return this->block; }
+	inline const Path& get_system_name() const { return this->system_name; }
 
 	FSObject() = delete;
 	FSObject(FileSystem& fs);

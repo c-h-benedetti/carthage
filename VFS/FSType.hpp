@@ -12,18 +12,16 @@ using FlagType = u_char;
  * A flag can be the union of multiple values.
  */
 enum class FSType : FlagType{
-	UNKNOWN,
-	REMOVED,
-	ROOT,
-	CONTAINER,
-	FILE,
-	FOLDER,
-	VERSIONABLE,
-	CURRENT,
-	VERSION
+    UNKNOWN = 0,
+	REMOVED = 1 << 0,
+	ROOT = 1 << 1,
+	FILE = 1 << 2,
+	FOLDER = 1 << 3,
+	VERSIONABLE = 1 << 4,
+	CURRENT = 1 << 5,
+	VERSION = 1 << 6
 };
 
-inline bool container_raised(const FSType& f){ return static_cast<FlagType>(FSType::CONTAINER) & static_cast<FlagType>(f); }
 inline bool root_raised(const FSType& f){ return static_cast<FlagType>(FSType::ROOT) & static_cast<FlagType>(f); }
 inline bool removed_raised(const FSType& f){ return static_cast<FlagType>(FSType::REMOVED) & static_cast<FlagType>(f); }
 inline bool file_raised(const FSType& f){ return static_cast<FlagType>(FSType::FILE) & static_cast<FlagType>(f); }

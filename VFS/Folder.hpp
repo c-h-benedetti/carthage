@@ -23,11 +23,14 @@ public:
 	bool accept_files() const override{ return true; }
 	bool accept_folders() const override{ return true; }
 	// IMPROVE: [Folder] Modify the code that blocks the creation of a Versionable in a Versionable.
-	bool accept_versionables() const override{ return true; }
+	bool accept_versionables() const override;
 
 	void new_file(const ArgsNewFile& args) override;
 	void new_folder(const ArgsNewFolder& args) override;
 	void new_versionable(const ArgsNewVersionable& fs) override;
+
+	void join(Path& p) override;
+	void unjoin(Path& p) override;
 
 	Folder() = delete;
 	Folder(FileSystem& fs);

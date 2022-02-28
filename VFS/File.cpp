@@ -1,7 +1,7 @@
 #include "File.hpp"
 
 void File::load(){
-	std::cerr << "Launching file: " << this->block.name << std::endl;
+	// std::cerr << "Launching file: " << this->block.name << std::endl;
 }
 
 

@@ -21,11 +21,11 @@ public:
 	/// Position of the content of a Container in the VFS. Can be used with seekp() or seekg().
 	FSPos content = 0;
 	/// Unique ID of an object of the VFS: [a-z0-9]{SIZE_OF_ID}. Capital letters are not used in order to be able to use the id as the system's name on Windows as well.
-	ID id{0};
+	ID id;
 	/// Displayed name of the object.
-	Name name{0};
+	Name name;
 	/// If the object is a file, this contains its extension (txt, blend, ...)
-	Extension extension{0};
+	Extension extension;
 	/// Number of folders in the container
 	FSize nb_folders = 0;
 	/// Number of files in the container
@@ -55,6 +55,12 @@ public:
 
 	void after_reading();
 	void before_writting();
+
+	FSBlock(){
+		this->id.nullify();
+		this->extension.nullify();
+		this->name.nullify();
+	}
 };
 
 

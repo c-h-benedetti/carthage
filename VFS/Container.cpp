@@ -104,7 +104,7 @@ int Container::linking_segment(const FSPos& insert){
  * 
  * | Returns true if the name already exists, false otherwise.
  */
-bool name_exists(const Name& n, const Extension& ext){
+bool Container::name_exists(const Name& n, const Extension& ext){
 	size_t i = 0;
 	bool found = false;
 

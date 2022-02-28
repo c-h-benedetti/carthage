@@ -148,6 +148,26 @@ void Folder::new_versionable(const ArgsNewVersionable& args){
 }
 
 
+bool Folder::accept_versionables() const{
+	for (size_t i = 0 ; i <= this->refer_to.head ; i++){
+		if (versionable_raised(this->refer_to.stack[i].data().flag)){
+			return false;
+		}
+	}
+	return true;
+}
+
+
+void Folder::join(Path& p){
+	p = p / this->system_name;
+}
+
+
+void Folder::unjoin(Path& p){
+	p = p.parent_path();
+}
+
+
 // # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 // #       CONSTRUCTORS                                                                      #
 // # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #

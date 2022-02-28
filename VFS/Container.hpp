@@ -15,7 +15,6 @@ protected:
 	template <size_t N>
 	int create_element(FSBlock& blc, std::function<FSObject(const Path&, const FSPos&)>& instanciating,	std::vector<FSObject>& collection);
 
-	void load() override;
 	Path make_path(FSBlock& b) const;
 	int linking_segment(const FSPos& insert);
 	bool name_exists(const Name& n, const Extension& ext);
@@ -24,6 +23,8 @@ protected:
 	const Path& vfs_path() const;
 	
 public:
+
+	void load() override;
 
 	virtual size_t size() const = 0;
 	virtual const FSObject& at(const size_t& i) const = 0;
