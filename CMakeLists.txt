@@ -56,6 +56,7 @@ set(VFS_SRC
 	VFS/arg_blocks.cpp
 	VFS/VFS_IO.hpp
 	VFS/VFS_IO.cpp
+	VFS/VFS_IO.tpp
 )
 
 set(ROOT_SRC

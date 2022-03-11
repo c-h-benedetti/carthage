@@ -119,7 +119,7 @@ int Container::link_segment(const FSPos& insert){
 			last = c_pos + (size * sizeof(FSBlock));
 		});
 
-		this->refer_to.vfs_io().ask_writer().override_address(last, insert);
+		this->refer_to.vfs_io().ask_writer().override<FSPos>(last, insert);
 	}
 
 	return 0;

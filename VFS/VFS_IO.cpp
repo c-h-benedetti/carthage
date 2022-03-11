@@ -12,7 +12,7 @@ static_assert(
 	"Mixed endianness is not handled"
 );
 
-
+constexpr bool is_big = std::endian::native == std::endian::big;
 
 // # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 // #                                                                                             #
@@ -26,20 +26,20 @@ int VFSReader::open(){
 		return 0;
 	}
 	else{
-		return 1;
+		this->raise(VFSError::OPEN_FAIL);
+		this->stream = nullptr;
+		return this->state;
 	}
 }
 
 
-int VFSReader::close(){
+void VFSReader::close(){
 	if (this->stream){
 		this->stream->close();
 	}
 	this->stream = nullptr;
-	return 0;
 }
 
-constexpr bool is_big = std::endian::native == std::endian::big;
 
 void VFSReader::init(){
 	if (is_big){
@@ -72,7 +72,6 @@ void VFSReader::init(){
 
 
 VFSReader& VFSReader::sequence(const FSPos& p){
-	this->state = this->open();
 	if (!this->state){
 		this->stream->seekg(p);
 	}
@@ -80,42 +79,19 @@ VFSReader& VFSReader::sequence(const FSPos& p){
 }
 
 
-VFSReader& VFSReader::read_fsize(FSize& s){
-	if (!this->state){
-		this->stream->read((char*)&s, sizeof(FSize));
-		AfterReading<FSize>::behavior(s);
-	}
-	return *this;
-}
-
-
-VFSReader& VFSReader::read_fsblock(FSBlock& b){
-	if (!this->state){
-		this->stream->read((char*)&b, sizeof(FSBlock));
-		AfterReading<FSBlock>::behavior(b);
-	}
-	return *this;
-}
-
-
-VFSReader& VFSReader::read_fspos(FSPos& p){
-	if (!this->state){
-		this->stream->read((char*)&p, sizeof(FSPos));
-		AfterReading<FSPos>::behavior(p);
-	}
-	return *this;
-}
-
-
+/**
+ * This function uses the head's position which is already set for this stream object. It is not reset to 0.
+ */
 int VFSReader::linear_browsing(std::function<void(const FSize&, const FSBlock*, const FSPos&, const FSPos&)> f){
-	if (this->open()){
-		return 1;
+	if (this->state){
+		return this->state;
 	}
 	else{
 
 		FSize seg_size = 0;
 		FSPos next = 0;
 		FSPos current = 0;
+		InputBuffer buffer;
 
 		while (this->stream->peek() != EOF){
 			
@@ -123,108 +99,87 @@ int VFSReader::linear_browsing(std::function<void(const FSize&, const FSBlock*, 
 			AfterReading<FSize>::behavior(seg_size);
 			
 			current = this->stream->tellg();
-			this->buffer.reset();
-			this->buffer.read_from(this->get_stream(), seg_size * sizeof(FSBlock) + sizeof(FSPos));
+			buffer.reset();
+			buffer.read_from(*(this->stream), seg_size * sizeof(FSBlock) + sizeof(FSPos));
 			FSBlock blocks[seg_size];
 
 			for (size_t i = 0 ; i < seg_size ; i++){
-				this->buffer.get<FSBlock>(blocks[i]);
+				buffer.get<FSBlock>(blocks[i]);
 			}
 
-			this->buffer.get<FSPos>(next);
+			buffer.get<FSPos>(next);
 
 			f(seg_size, blocks, current, next);
 		}
 
-		this->close();
 		return 0;
 	}
 }
 
-// IMPROVE: [VFSReader] We can open the object in the constructor eand close it in the destructor instead of summoning both these functions manually.
-
-// IMPROVE: [VFSReader][VFSWriter] Can be optimized, the dynamic buffer is certainly not useful in all operations.
+// IMPROVE: [FSBlock] A FSBlock should contain a constant variable making it easy to know if what we read from the VFS is corrupted. Ex: Add 8 bytes of zeros in the middle and check that we have a zero at reading.
 
 /**
- * Returns 0 on success.
- * If the return code is in the range of VFSReader::open() error codes, opening the VFS failed.
- * Returns 10 if the content's position is 0 (nullptr)
+ * #cont_pos is a segment address.
  */
 int VFSReader::browse_block_content(const FSPos& cont_pos, std::function<void(const FSize&, const FSBlock*, const FSPos&, const FSPos&)> f){
-
-	if (cont_pos){
-		int status = this->open();
 		
-		if (status){
-			this->close();
-			return status;
-		}
-		else{
-			FSPos c_pos = cont_pos;
-			FSPos next = 0;
-			FSize size = 0;
+	if (this->state){
+		return this->state;
+	}
+	else{
 
-			while (c_pos){
-				this->stream->seekg(c_pos);
-				this->buffer.read_from(this->get_stream(), sizeof(FSize));
-				this->buffer.get<FSize>(size);
-				FSBlock blocks[size];
-				this->buffer.read_from(this->get_stream(), size * sizeof(FSBlock) + sizeof(FSPos));
-				c_pos += sizeof(FSize);
+		InputBuffer buffer;
+		FSPos c_pos = cont_pos;
+		FSPos next = 0;
+		FSize size = 0;
 
-				for (size_t i = 0 ; i < size ; i++){
-					this->buffer.get<FSBlock>(blocks[i]);
-				}
+		while (c_pos){
+			this->stream->seekg(c_pos);
+			
+			this->stream->read((char*)&size, sizeof(FSize));
+			AfterReading<FSize>::behavior(size);
 
-				this->buffer.get<FSPos>(next);
+			FSBlock blocks[size];
 
-				f(size, blocks, c_pos, next);
+			buffer.read_from(*(this->stream), size * sizeof(FSBlock) + sizeof(FSPos));
+			c_pos += sizeof(FSize);
 
-				c_pos = next;
+			for (size_t i = 0 ; i < size ; i++){
+				buffer.get<FSBlock>(blocks[i]);
 			}
 
-			this->close();
+			buffer.get<FSPos>(next);
 
-			return 0;
+			f(size, blocks, c_pos, next);
+
+			c_pos = next;
 		}
 
 		return 0;
-	}
-	else{
-		return 10;
 	}
 }
 
 
 int VFSReader::probe_fsblock(const FSPos& pos, FSBlock& block){
-	if (pos){
-		int status = this->open();
-
-		if (status){
-			this->close();
-			return status;
-		}
-		else{
-			this->stream->seekg(pos);
-			this->buffer.read_from(this->get_stream(), sizeof(FSBlock));
-			this->buffer.get<FSBlock>(block);
-			this->close();
-			return 0;
-		}
-
-		return 0;
+	
+	if (this->state){
+		return this->state;
 	}
 	else{
-		return 10;
+		this->stream->seekg(pos);
+		this->stream->read((char*)&block, sizeof(FSBlock));
+		AfterReading<FSBlock>::behavior(block);
+		return 0;
 	}
 }
 
 
 int VFSReader::backtrack(std::vector<FSBlock>& blocks, const FSPos& pos){
-	if (pos){
-		if (this->open()){
-			return 2;
-		}
+	if (this->state){
+		return this->state;
+	}
+	else{
+
 		FSPos p_pos = pos;
 		blocks.clear();
 		FSBlock block;
@@ -233,15 +188,12 @@ int VFSReader::backtrack(std::vector<FSBlock>& blocks, const FSPos& pos){
 			this->stream->seekg(p_pos);
 			this->stream->read((char*)&block, sizeof(FSBlock));
 			AfterReading<FSBlock>::behavior(block);
+
 			blocks.push_back(block);
 			p_pos = block.parent;
 		}
 
-		this->close();
 		return 0;
-	}
-	else{
-		return 1;
 	}
 }
 
@@ -251,6 +203,7 @@ VFSReader::VFSReader(const Path& p, std::function<void()> c): vfs_path(p), callb
 	if (!fs::exists(this->vfs_path) || !fs::is_regular_file(this->vfs_path)){
 		throw "The path provided for the VFS is not valid.";
 	}
+	this->open();
 }
 
 
@@ -260,12 +213,12 @@ VFSReader::~VFSReader(){
 }
 
 
-
 // # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 // #                                                                                             #
 // #       VFS WRITER IMPLEMENTATION                                                             #
 // #                                                                                             #
 // # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
 
 int VFSWriter::open(){
 	this->stream = std::unique_ptr<std::ofstream>(new std::ofstream(this->vfs_path, std::ios::in | std::ios::out | std::ios::binary));
@@ -273,17 +226,18 @@ int VFSWriter::open(){
 		return 0;
 	}
 	else{
-		return 1;
+		this->stream = nullptr;
+		this->raise(VFSError::OPEN_FAIL);
+		return this->state;
 	}
 }
 	
 
-int VFSWriter::close(){
+void VFSWriter::close(){
 	if (this->stream){
 		this->stream->close();
 	}
 	this->stream = nullptr;
-	return 0;
 }
 
 
@@ -316,134 +270,67 @@ void VFSWriter::init(){
 	}
 }
 
-// IMPROVE: [VFSWriter] Factorise the override_xxx() code with templates
-int VFSWriter::override_fsblock(const FSPos& pos, const FSBlock& block){
-	if (pos && !this->open()){
-		this->stream->seekp(pos);
-		FSBlock data = block;
-		BeforeWriting<FSBlock>::behavior(data);
-		this->stream->write((char*)&data, sizeof(FSBlock));
-		this->close();
-		return 0;
-	}
-	else{
-		return 1;
-	}
-}
-	
-int VFSWriter::override_address(const FSPos& pos, const FSPos& next_val){
-	if (pos && !this->open()){
-		this->stream->seekp(pos);
-		FSPos data = next_val;
-		BeforeWriting<FSPos>::behavior(data);
-		this->stream->write((char*)&data, sizeof(FSPos));
-		this->close();
-		return 0;
-	}
-	else{
-		return 1;
-	}
-}
-
-int VFSWriter::override_fsize(const FSPos& pos, const FSize& size){
-	if (pos && !this->open()){
-		this->stream->seekp(pos);
-		FSize data = size;
-		BeforeWriting<FSize>::behavior(data);
-		this->stream->write((char*)&data, sizeof(FSize));
-		this->close();
-		return 0;
-	}
-	else{
-		return 1;
-	}
-}
 
 int VFSWriter::blank_segments(const FSize& count, FSPos& insert){
-	const size_t b_size = sizeof(FSize) + sizeof(FSBlock) + sizeof(FSPos);
-	BasicBuffer<b_size> buffer;
-	FSize s = 1;
-	BeforeWriting<FSize>::behavior(s);
-	buffer.add<FSize>(s);
-	buffer.add<FSBlock>(FSBlock());
-	buffer.add<FSPos>(0);
-	this->buffer.reset();
-
-	for (size_t i = 0 ; i < count ; i++){
-		this->buffer.copy_from(&buffer, b_size);
-	}
-
-	if (this->open()){
-		return 1;
+	if (this->state || !count){
+		this->raise(VFSError::INVALID_COUNT);
+		return this->state;
 	}
 	else{
+		constexpr size_t b_size = sizeof(FSize) + sizeof(FSBlock) + sizeof(FSPos);
+		BasicBuffer<b_size> segment;
+		
+		FSize s = 1;
+		BeforeWriting<FSize>::behavior(s);
+		segment.add<FSize>(s);
+
+		segment.add<FSBlock>(FSBlock());
+		segment.add<FSPos>(0);
+		
+		OutputBuffer buffer;
+		for (size_t i = 0 ; i < count ; i++){
+			buffer.copy_from(&segment, b_size);
+		}
+
 		this->stream->seekp(0, std::ios_base::end);
 		insert = this->stream->tellp();
-		this->buffer.write_to(this->get_stream());
-		this->close();
-		return 0;		
+		buffer.write_to(*(this->stream));
+
+		return 0;
 	}
 }
 
-int VFSWriter::blank_segment(const FSize& count, FSPos& insert){
-	this->buffer.reset();
-	FSBlock block{};
-	
-	this->buffer.add<FSize>(count);
-	for (size_t i = 0 ; i < count ; i++){
-		this->buffer.add<FSBlock>(block);
-	}
-	this->buffer.add<FSPos>(0);
 
-	if (this->open()){
-		return 1;
+int VFSWriter::blank_segment(const FSize& count, FSPos& insert){
+
+	if (this->state || !count){
+		this->raise(VFSError::INVALID_COUNT);
+		return this->state;
 	}
 	else{
+		OutputBuffer buffer;
+
+		buffer.add<FSize>(count);
+
+		FSBlock block{};
+		for (size_t i = 0 ; i < count ; i++){
+			buffer.add<FSBlock>(block);
+		}
+
+		buffer.add<FSPos>(0);
+
 		this->stream->seekp(0, std::ios_base::end);
 		insert = this->stream->tellp();
-		this->buffer.write_to(this->get_stream());
-		this->close();
-		return 0;		
+		buffer.write_to(*(this->stream));
+
+		return 0;
 	}
 }
 
 
 VFSWriter& VFSWriter::sequence(const FSPos& pos){
-	if (this->open()){
-		this->state = 1;
-	}
-	else{
+	if (!this->state){
 		this->stream->seekp(pos);
-	}
-	return *this;
-}
-
-
-VFSWriter& VFSWriter::add_fsize(const FSize& size){
-	if (!this->state){
-		FSize s = size;
-		BeforeWriting<FSize>::behavior(s);
-		this->stream->write((char*)&s, sizeof(FSize));
-	}
-	return *this;
-}
-
-
-VFSWriter& VFSWriter::add_fsblock(const FSBlock& blc){
-	if (!this->state){
-		FSBlock b = blc;
-		BeforeWriting<FSBlock>::behavior(b);
-		this->stream->write((char*)&b, sizeof(FSBlock));
-	}
-	return *this;
-}
-
-
-VFSWriter& VFSWriter::add_fspos(const FSPos& pos){
-	if (!this->state){
-		FSPos p = pos;
-		BeforeWriting<FSPos>::behavior(p);
-		this->stream->write((char*)&p, sizeof(FSPos));
 	}
 	return *this;
 }
@@ -454,11 +341,13 @@ VFSWriter::VFSWriter(const Path& p, std::function<void()> c, const bool& reset):
 	if (!fs::exists(p) || reset){
 		touch(p);
 	}
+	this->open();
 }
 
 
 VFSWriter::~VFSWriter(){
 	this->close();
+	this->callback();
 }
 
 
@@ -494,7 +383,7 @@ VFSWriter VFS_IO::ask_writer(const bool& reset){
 	}, reset);
 }
 
-// IMPROVE: [VFS_IO] Create the empty elements here if they don't exist.
+
 VFS_IO::VFS_IO(const Path& u_root): user_root(u_root), vfs_path(u_root / CARTHAGE_DIR / VFS_DESCRIPTOR){
 
 	// If the user-provided path doesn't exist or isn't a directory.
@@ -534,4 +423,3 @@ Path VFS_IO::make_path(const Path& base_path, FSBlock& block){
 	return base_path / sn.c_str();
 }
 
-// Si un writer est demandé, on ne doit plus accepter les readers (on les met en attente)

@@ -150,7 +150,7 @@ int FSObject::reload_from_vfs(){
  * | Returns 2 if the block_pos == 0 (nullptr for the VFS).
  */
 int FSObject::override_vfs() const{
-	return this->refer_to.vfs_io().ask_writer().override_fsblock(this->block_pos, this->block);
+	return this->refer_to.vfs_io().ask_writer().override<FSBlock>(this->block_pos, this->block);
 }
 
 

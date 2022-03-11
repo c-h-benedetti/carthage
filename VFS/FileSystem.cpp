@@ -40,7 +40,7 @@ int FileSystem::new_vfs(const char* n){
 	block.time = fs::last_write_time(data);
 
 	// = = = 3. Inserting a segment in the VFS file. The VFSWriter constructor will create it if it doesn't exist. = = =
-	return this->io_manager.ask_writer(true).sequence(0).add_fsize(1).add_fsblock(block).add_fspos(0).status();
+	return this->io_manager.ask_writer(true).sequence(0).add<FSize>(1).add<FSBlock>(block).add<FSPos>(0).status();
 	// IMPROVE: [FileSystem] Error handling on output in new_vfs()
 }
 

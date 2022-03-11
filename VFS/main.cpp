@@ -65,7 +65,7 @@ void display_block(const FSBlock& block){
 
 // IMPROVE: [FileSystem] The ask_reader() method must be const.
 
-void inspect_vfs(FileSystem& vfs){
+void vfs_to_json(FileSystem& vfs){
 	std::cout << "[" << std::endl;
 	bool first = true;
 
@@ -97,6 +97,7 @@ void inspect_vfs(FileSystem& vfs){
 	std::cout << "]" << std::endl;
 }
 
+
 void cheat_inspect_vfs(FileSystem& vfs){
 
 	std::ifstream str(vfs.vfs_io().vfs_path);
@@ -124,11 +125,9 @@ int main(int argc, char* argv[], char* env[]){
 	
 	srand(time(NULL));
 
-	FileSystem vfs("/tmp", true, "Carthage");
+	FileSystem vfs("/tmp");
 
-	vfs.current()->override_vfs();
-
-	ArgsNewFolder anF1;
+	/*ArgsNewFolder anF1;
 	anF1.name = "F1";
 	anF1.icon = 3;
 	
@@ -139,9 +138,14 @@ int main(int argc, char* argv[], char* env[]){
 	ArgsNewFolder anF2;
 	anF2.name = "F2";
 	anF2.icon = 3;
-	vfs.current()->create_folder(anF2);
+	vfs.current()->create_folder(anF2);*/
 
-	inspect_vfs(vfs);
+	ArgsNewFolder anF3;
+	anF3.name = "F3";
+	anF3.icon = 3;
+	vfs.current()->create_folder(anF3);
+
+	vfs_to_json(vfs);
 
 
 	return 0;
