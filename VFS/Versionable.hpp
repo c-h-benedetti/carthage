@@ -5,19 +5,15 @@
 
 class Versionable : public Folder{
 
-	std::unique_ptr<Folder> current_version; 
+	Folder* current_version = nullptr; 
 
 private:
 
 	void dispatch(const std::vector<FSObject>& segment) override;
-	void load() override;
 
 public:
 
-	void join(Path& p) override;
-	void unjoin(Path& p) override;
-
-	// IMPROVE: [Versionable] Override Folder methods or transmit their call to current_version?
+	int open() override;
 
 	Versionable() = delete;
 	Versionable(FileSystem& fs);

@@ -22,13 +22,22 @@ set(BUFFERS_SRC
 	basic_buffers/SystemName.cpp
 )
 
+set(DYNAMIC_BUFFERS_SRC
+	dynamic_buffers/InputBuffer.hpp
+	dynamic_buffers/InputBuffer.tpp
+	dynamic_buffers/InputBuffer.cpp
+	dynamic_buffers/OutputBuffer.hpp
+	dynamic_buffers/OutputBuffer.tpp
+	dynamic_buffers/OutputBuffer.cpp
+)
+
 set(VFS_SRC
 	VFS/FSBlock.cpp
 	VFS/FSBlock.hpp
 	VFS/FSObject.hpp
 	VFS/FSObject.cpp
 	VFS/FSType.hpp
-	VFS/utils.c
+	VFS/utils.cpp
 	VFS/utils.h
 	VFS/File.hpp 
 	VFS/File.cpp 
@@ -37,7 +46,6 @@ set(VFS_SRC
 	VFS/Versionable.hpp 
 	VFS/Versionable.cpp 
 	VFS/Container.hpp
-	VFS/Container.tpp 
 	VFS/Container.cpp 
 	VFS/FileSystem.hpp 
 	VFS/FileSystem.cpp
@@ -46,6 +54,8 @@ set(VFS_SRC
 	VFS/arguments.tpp
 	VFS/arg_blocks.hpp
 	VFS/arg_blocks.cpp
+	VFS/VFS_IO.hpp
+	VFS/VFS_IO.cpp
 )
 
 set(ROOT_SRC
@@ -67,6 +77,26 @@ add_executable(Buffers_test
 	basic_buffers/main.cpp
 )
 
+# = = = = DYNAMIC BUFFERS = = = = 
+
+add_library(DYNAMIC_BUFFERS_LIB
+	${DYNAMIC_BUFFERS_SRC}
+)
+
+target_include_directories(DYNAMIC_BUFFERS_LIB 
+	PUBLIC basic_buffers
+	PUBLIC dynamic_buffers
+)
+
+add_executable(Dynamic_buffers_test
+	${DYNAMIC_BUFFERS_SRC}
+	dynamic_buffers/main.cpp
+)
+
+target_link_libraries(Dynamic_buffers_test
+	PUBLIC BUFFERS_LIB
+)
+
 # = = = = VFS = = = = 
 
 add_library(VFS_LIB
@@ -75,6 +105,7 @@ add_library(VFS_LIB
 
 target_include_directories(VFS_LIB 
 	PUBLIC basic_buffers
+	PUBLIC dynamic_buffers
 	PUBLIC VFS
 )
 
@@ -85,6 +116,7 @@ add_executable(VFS_test
 
 target_link_libraries(VFS_test
 	PUBLIC BUFFERS_LIB
+	PUBLIC DYNAMIC_BUFFERS_LIB
 )
 
 # = = = = PROJECT = = = = 
@@ -95,10 +127,12 @@ add_executable(${PROJECT_NAME}
 
 target_include_directories(${PROJECT_NAME} 
 	PUBLIC basic_buffers
+	PUBLIC dynamic_buffers
 	PUBLIC VFS
 )
 
 target_link_libraries(${PROJECT_NAME}
 	PUBLIC BUFFERS_LIB
+	PUBLIC DYNAMIC_BUFFERS_LIB
 	PUBLIC VFS_LIB
 )

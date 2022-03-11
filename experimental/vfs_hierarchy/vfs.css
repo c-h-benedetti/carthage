@@ -1,0 +1,35 @@
+html, body{
+	background-color: #1b1b1b;
+	color: #b2b9e1;
+	font-family: monospace;
+	font-size: 1.3em;
+	line-height: 0.5px;
+	letter-spacing: 0.01em;
+}
+
+.data{
+
+}
+
+.shift{
+	color: rgba(255, 255, 255, 0.2);
+}
+
+.hint{
+	font-size: 0.6em;
+	color: rgba(235, 64, 52, 0.5);
+}
+
+.ROOT > .hint{
+	display: none;
+}
+
+.line.ROOT{
+	font-weight: bold;
+	font-size: 1.15em;
+}
+
+.line.REMOVED{
+	font-style: italic;
+	opacity: 0.5;
+}

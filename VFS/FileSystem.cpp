@@ -4,13 +4,14 @@
 #include <fstream>
 #include <string>
 
-// IMPROVE: Update the content of this block along the implementation of new features
+// IMPROVE: [FileSystem] Update the content of this block along the implementation of new features
 
 /**
  * Function returning the block every VFS starts with.
  */
 static FSBlock file_system_default(const char* n){
 	FSBlock b;
+
 	b.content = 0;
 	b.id.randomize();
 	b.name = (n) ? (n) : ("Data");
@@ -20,155 +21,30 @@ static FSBlock file_system_default(const char* n){
 }
 
 /**
- * Create a new empty VFS from scratch.
+ * Creates a new empty VFS from scratch.
  * Only the Carthage's hierarchy and a root are added (which is the minimal)
  */
-void FileSystem::new_vfs(const char* n){
+int FileSystem::new_vfs(const char* n){
 
-	// Creating the root of the VFS, the first block in the first segment.
-	BasicBuffer<sizeof(FSize) + sizeof(FSBlock) + sizeof(FSPos)> segment;
+	// = = = 1. Creating the root of the VFS. The first block, in the first segment. = = =
 	FSBlock block = file_system_default(n);
-	block.before_writting();
-	segment.add<FSize>(1).add<FSBlock>(block).add<FSPos>(0);
 
-	// Creating the Carthage's hidden directory.
-	Path p = this->user_root / CARTHAGE_DIR;
-	if (!fs::exists(p)){
-		fs::create_directory(p);
-	}
-
-	// Creating the data's root according to the newly created block.
+	// = = = 2. Creating the data's folder on the system, according to the newly created block. = = =
 	SystemName name(block.id);
-	Path data = this->user_root / name.c_str();
-	if (!fs::exists(data)){
-		fs::create_directory(data);
+	Path data = this->io_manager.user_root / name.c_str();
+
+	if (!fs::create_directory(data)){
+		return 2;
 	}
 
-	// Writing the new block in the VFS.
-	std::ofstream str(this->vfs_file, std::ios::out | std::ios::binary);
+	block.time = fs::last_write_time(data);
 
-	if (str.is_open()){
-		segment.write_to(str);
-		str.close();
-	}
-	else{
-		BasicBuffer<128> msg(0);
-		msg.copy_from("Failed to create the VFS to: ").copy_from(this->vfs_file.c_str());
-		throw std::ios_base::failure(msg.c_str());
-	}
+	// = = = 3. Inserting a segment in the VFS file. The VFSWriter constructor will create it if it doesn't exist. = = =
+	return this->io_manager.ask_writer().sequence(0).add_fsize(1).add_fsblock(block).add_fspos(0).status();
+	// IMPROVE: [FileSystem] Error handling on output in new_vfs()
 }
 
 
-// IMPROVE: [FileSystem] When maps will be implemented, pass an ID rather than an object. An index could also be used.
-void FileSystem::open(const FSObject& obj){
-
-	// IMPROVE: [FileSystem] Is reloading useful? Check deletion. Handle errors.
-	this->current_obj->reload_from_vfs();
-
-	FSType flag = obj.data().flag;
-
-	// IMPROVE: [FileSystem] Files opening handling is not very clean.
-
-	if (file_raised(flag)){
-		File file(obj);
-		file.load();
-		return;
-	}
-	else if(folder_raised(flag)){
-		this->current_obj = std::unique_ptr<Container>(new Folder(obj));
-	}
-	else if(versionable_raised(flag)){
-		this->current_obj = std::unique_ptr<Container>(new Versionable(obj));
-	}
-	else{
-		// IMPROVE: [FileSystem] Improve error handling if the data type is unknown. Find a way to cancel operation to leave in stable state.
-		return;
-	}
-
-	if (this->head != this->stack.size() - 1){
-		this->stack = std::vector<FSObject>(this->stack.begin(), this->stack.begin() + head + 1);
-	}
-
-	this->current_obj->reload_from_vfs();
-	this->stack.push_back(obj);
-	this->head = this->stack.size() - 1;
-	this->current_obj->load();
-	this->current_obj->join(this->current_path);
-}
-
-// IMPROVE: [FileSystem] Refactorize the code between open(), previous() & next().
-
-void FileSystem::next(){
-	if (this->head < this->stack.size() - 1){
-
-		this->head++;
-		const FSObject& obj = this->stack[this->head];
-		FSType flag = obj.data().flag;
-
-		if (folder_raised(flag)){
-			this->current_obj = std::unique_ptr<Container>(new Folder(obj));
-		}
-		else if (versionable_raised(flag)){
-			this->current_obj = std::unique_ptr<Container>(new Versionable(obj));
-		}
-		else{
-			// IMPROVE: [FileSystem] Improve error handling if the data type is unknown. Find a way to cancel operation to leave in stable state.
-			return;
-		}
-
-		this->current_obj->reload_from_vfs();
-		this->current_obj->load();
-		this->current_obj->join(this->current_path);
-	}
-}
-
-// DEBUG: [General] Make a verbose mode with preprocessor blocks.
-
-void FileSystem::previous(){
-	if (this->head > 0){
-
-		this->head--;
-		const FSObject& obj = this->stack[this->head];
-		FSType flag = obj.data().flag;
-
-		if (folder_raised(flag)){
-			this->current_obj = std::unique_ptr<Container>(new Folder(obj));
-		}
-		else if (versionable_raised(flag)){
-			this->current_obj = std::unique_ptr<Container>(new Versionable(obj));
-		}
-		else{
-			// IMPROVE: [FileSystem] Improve error handling if the data type is unknown. Find a way to cancel operation to leave in stable state.
-			return;
-		}
-
-		this->current_obj->reload_from_vfs();
-		this->current_obj->load();
-		this->current_obj->unjoin(this->current_path);
-	}
-}
-
-
-FileSystem::FileSystem(const Path& p, bool reset, const char* n) : 
-	current_path(p),
-	user_root(p),
-	vfs_file(p / CARTHAGE_DIR / VFS_DESCRIPTOR)
-{
-
-	// If the user-provided directory doesn't exist.
-	if (!fs::exists(p)){
-		BasicBuffer<128> msg(0);
-		msg.copy_from("The path \"").copy_from(p.c_str()).copy_from("\" doesn't exist.");
-		throw std::invalid_argument(msg.c_str());
-	}
-
-	if (reset || !fs::exists(this->vfs_file)){
-		this->new_vfs(n);
-	}
-
-	// Opening the first segment contained in the VFS file.
-	this->open_root();
-}
 
 // DEBUG: [FSBlock] Check why calling constructor Name{0} or Extension{0} makes a segmentation fault.
 
@@ -177,28 +53,62 @@ FileSystem::FileSystem(const Path& p, bool reset, const char* n) :
  * The first segment is constant in term of size.
  * Its size is always of 1, and its next pointer is to 0.
  */
-void FileSystem::open_root(){
-	// IMPROVE: [FileSystem] Remplacer "sizeof(FSize)" par une variable de préprocesseur au cas où l'architecture change.
-	this->current_obj = std::unique_ptr<Folder>(new Folder{
-		*this,
-		FSBlock(),
-		sizeof(FSize)
-	});
-
-	this->current_obj->reload_from_vfs();
-
-	if (removed_raised(this->current_obj->data().flag)){
+int FileSystem::open_root(){
+	
+	// = = = 1. Creating a new Folder object and filling it with the first block of the VFS. = = =
+	this->stack.push_back(
+		new Folder{
+			*this,
+			FSBlock(),
+			FIRST_BLOCK_POSITION
+		}
+	);
+	
+	// Replacing the blank FSBlock with the one from the VFS
+	if (this->current()->reload_from_vfs()){
 		BasicBuffer<128> msg(0);
-		msg.copy_from("The root block of the VFS seems to be corrupted.");
+		msg.copy_from("Impossible to load the root from the VFS.");
 		throw std::logic_error(msg.c_str());
 	}
-
-	this->stack.push_back(FSObject(*this->current_obj));
-	this->current_obj->join(this->current_path);
-	this->current_obj->load();
+	
+	// Checking that the flag is correct.
+	if (removed_raised(this->current()->get_data().flag)){
+		BasicBuffer<128> msg(0);
+		msg.copy_from("The root block of the VFS seems to be corrupted, its REMOVED flag is raised.");
+		throw std::logic_error(msg.c_str());
+	}
+	
+	// = = = 2. Opening the root as a regular Folder object. = = =
+	return this->current()->load();
 }
 
 
+
+/**
+ * Builds a FileSystem object.
+ * p: Root path of Carthage's target. Should point to a directory.
+ * reset: If a Carthage setup already exists, should it be overriden?
+ * n: Name to give to the project. Can be nullptr.
+ */
+FileSystem::FileSystem(const Path& p, bool reset, const char* n): io_manager(p){
+	
+	if (reset || !fs::exists(this->io_manager.vfs_path)){
+		// Creating a basic Carthage hierarchy and a minimal VFS file containing the root segment.
+		if (this->new_vfs(n)){
+			// IMPROVE: [FileSystem] Should throw a more suitable type of exception.
+			throw std::invalid_argument("FileSystem::FileSystem: Failed to create a new VFS.");
+		}
+	}
+	
+	// Opening the first segment contained in the VFS file.
+	if (this->open_root()){
+		throw std::invalid_argument("FileSystem::FileSystem: Failed to open the VFS.");
+	}
+}
+
+// IMPROVE: [FileSystem] Rebuild hierarchy functions
+
+/*
 static void recursive_hierarchy(size_t depth, const FSBlock& block, std::ifstream& vfs, std::ofstream& str){
 	BasicBuffer<2048> buffer(0);
 
@@ -337,6 +247,7 @@ static void recursive_hierarchy(size_t depth, const FSBlock& block, std::ifstrea
 	}
 }
 
+
 void FileSystem::make_hierarchy(const Path& out) const{
 	std::ofstream str(out, std::ios::out | std::ios::binary);
 	std::ifstream vfs(this->vfs_file, std::ios::in | std::ios::binary);
@@ -365,4 +276,4 @@ void FileSystem::make_hierarchy(const Path& out) const{
 
 	str.close();
 	vfs.close();
-}
+}*/

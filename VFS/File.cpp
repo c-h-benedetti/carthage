@@ -1,7 +1,13 @@
 #include "File.hpp"
 
-void File::load(){
+int File::load(){
 	// std::cerr << "Launching file: " << this->block.name << std::endl;
+	return 0;
+}
+
+
+int File::open(){
+	return this->load();
 }
 
 

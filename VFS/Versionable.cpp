@@ -1,18 +1,23 @@
 #include "Versionable.hpp"
+#include "FileSystem.hpp"
 
 // DEBUG: [Versionable] Check that the segment contains exactly one FSType::CURRENT
 
 void Versionable::dispatch(const std::vector<FSObject>& segment){
 	this->content.clear();
-	this->content.reserve(this->block.nb_files + this->block.nb_folders + this->block.nb_versionables);
+	this->content.reserve(this->block.nb_folders);
+	int found = 0;
 
 	for(const FSObject& obj : segment){
-		if (!removed_raised(obj.data().flag)){
-			if (!folder_raised(obj.data().flag)){
-				if (current_raised(obj.data().flag)){
-					this->current_version = std::unique_ptr<Folder>(new Folder(obj));
+		if (!removed_raised(obj.get_data().flag)){
+			if (!folder_raised(obj.get_data().flag)){
+				if (current_raised(obj.get_data().flag)){
+					if (!found){
+						this->current_version = new Folder(obj);
+						found++;
+					}
 				}
-				else if (version_raised(obj.data().flag)){
+				else if (version_raised(obj.get_data().flag)){
 					this->content.push_back(obj);
 				}
 			}
@@ -21,20 +26,20 @@ void Versionable::dispatch(const std::vector<FSObject>& segment){
 }
 
 
-void Versionable::load(){
-	this->Folder::load();
-	this->current_version->load();
+int Versionable::open(){
+	this->load();
+
+	if (this->current_version){
+		this->current_version->open();
+		this->refer_to.add(this->current_version);
+		return 0;
+	}
+	else{
+		return 1;
+	}
 }
 
 
-void Versionable::join(Path& p){
-	p = p / this->system_name / this->current_version->get_system_name();
-}
-
-
-void Versionable::unjoin(Path& p){
-	p = p.parent_path().parent_path();
-}
 
 // # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 // #       CONSTRUCTORS                                                                      #

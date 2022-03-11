@@ -1,37 +1,119 @@
-#include "FSObject.hpp"
 #include "SystemName.hpp"
 #include "FileSystem.hpp"
+#include "File.hpp"
+#include "Versionable.hpp"
 #include <fstream>
+#include <vector>
 
-/**
- * Overrides the block in the VFS file from this instance's FSObject::block (FSBlock).
- * Only this block is affected, it is not a general refreshing of the VFS.
- * The position where to write is known through FSObject::block_pos.
- * 
- * | Returns 0 on success.
- * | Returns 1 if the VFS could not be opened.
- */
-int FSObject::override_vfs() const{
-	// Copying the block in order to format it before writing it in the buffer.
-	FSBlock b = this->block;
-	b.before_writting();
-	BasicBuffer<sizeof(FSBlock)> buffer;
-	buffer.add<FSBlock>(b);
+int FSObject::open(){
+	if (this->reload_from_vfs()){
+		return 6;
+	}
 
-	// Moving to the position of this object in the VFS and overwriting the block with the content of the buffer.
-	std::ofstream str(this->refer_to.vfs_path(), std::ios::out | std::ios::in | std::ios::binary);
-	if (str.is_open()){
-		str.seekp(this->block_pos);
-		buffer.write_to(str);
-		str.close();
+	if (file_raised(this->block.flag)){
+		File file(*this);
+
+		if (file.open()){
+			return 1;
+		}
+	}
+	else if (folder_raised(this->block.flag)){
+		this->refer_to.add(new Folder(*this));
+		return this->refer_to.open();
+	}
+	else if (versionable_raised(this->block.flag)){
+		this->refer_to.add(new Versionable(*this));
+		return this->refer_to.open();
 	}
 	else{
-		std::cerr << "The VFS could not be open in " << this->block.name << std::endl;
-		return 1;
+		return 5;
 	}
 
 	return 0;
 }
+
+
+bool FSObject::is_current() const{ 
+	return this->refer_to.current() == this; 
+}
+
+
+/**
+ * Builds the path of this block by following the @previous pointer until finding a nullptr.
+ * The returned path can be invalid if the chain is broken.
+ * Even on success, the returned path doesn't necessarily exist.
+ * If #check points to an integer, it will contain the execution's status code.
+ *  | 0: Success
+ *  | 1: Error, the root was not found along the path.
+ * 
+ * Return value:
+ *  | If the operation is a success (status code 0) the path is returned.
+ *  | If the root is missing (status code 1), an empty path is returned.
+ */
+Path FSObject::data_path(int* check) const{
+	// 1. Initialization by fetching the list of objects along the path.
+	Path path = "";
+	int status = 0;
+
+	std::cout << "A" << std::endl;
+	std::vector<const FSObject*> list;
+	list.push_back(this);
+	FSObject* prev = this->previous;
+
+	std::cout << "B" << std::endl;
+	// DEBUG: [FSObject] Check que root n'est rencontré qu'une fois, que le previous de la root est nullptr.
+	while (prev){
+		list.push_back(prev);
+		prev = prev->previous;
+	}
+
+	std::cout << "C" << std::endl;
+	// 2. If the last recorded object is not the root, the path won't be valid, we can abort.
+	if (!root_raised(list.back()->get_data().flag)){
+		status = 1;
+	}
+	else{
+		// 3. Assembling the path.
+		path = this->refer_to.vfs_io().user_root;
+		// IMPROVE: [FSObject] Check if a way exists to reserve some place for the path.
+		std::cout << "E" << std::endl;
+		std::cout << "SIZE: " << list.size() << std::endl;
+		size_t l_size = list.size();
+		for (size_t i = 0 ; i < l_size ; i++){
+			std::cout << "PREV: " << i << std::endl;
+			path /= list[l_size - i - 1]->get_system_name();
+		}
+		std::cout << "F" << std::endl;
+	}
+	std::cout << "D" << std::endl;
+	if (check){ *check = status; }
+
+	return path;
+}
+
+
+Path FSObject::deduce_path(int* check) const{
+	std::vector<FSBlock> blocks;
+	int status = 0;
+	Path p = "";
+
+	if (this->refer_to.vfs_io().ask_reader().backtrack(blocks, this->block_pos)){
+		status = 1;
+	}
+	else{
+		p = this->refer_to.vfs_io().user_root;
+		size_t b_size = blocks.size();
+		for (size_t i = 0 ; i < b_size ; i++){
+			SystemName sn{blocks[b_size - i - 1].id, blocks[b_size - i - 1].extension};
+			p /= sn.c_str();
+		}
+	}
+
+	if (check){ *check = status; }
+
+	return p;
+}
+
 
 
 /**
@@ -42,31 +124,47 @@ int FSObject::override_vfs() const{
  * | Returns 0 on success.
  * | Returns 1 if the object is marked as being removed in the VFS.
  * | Returns 2 if the VFS could not be opened.
+ * | Returns 3 if the block_pos == 0 (nullptr for the VFS).
  */
 int FSObject::reload_from_vfs(){
-	std::ifstream str(this->refer_to.vfs_path(), std::ios::binary | std::ios::in);
-	if (str.is_open()){
-		str.seekg(this->block_pos);
-		str.read((char*)&this->block, sizeof(FSBlock));
-		str.close();
+	std::cout << "1" << std::endl;
+	int status = this->refer_to.vfs_io().ask_reader().probe_fsblock(this->block_pos, this->block);
 
-		this->block.after_reading();
-
-		if (removed_raised(this->block.flag)){
-			std::cerr << "The object " << this->block.name << " was removed" << std::endl;
-			return 1;
-		}
-
-		SystemName sn{this->block.id, this->block.extension};
-		this->system_name = sn.c_str();
+	if (status){
+		std::cout << "2" << std::endl;
+		return status;
 	}
 	else{
-		std::cerr << "Failed to open VFS" << std::endl;
-		return 2;
+		std::cout << "3" << std::endl;
+		// IMPROVE: [FSObject] If the object was deleted, the FileSystem must react and find a stable state.
+		if (removed_raised(this->block.flag)){
+			std::cout << "4" << std::endl;
+			return 20;
+		}
+		else{
+			std::cout << "5" << std::endl;
+			SystemName sn{this->block.id, this->block.extension};
+			this->system_name = sn.c_str();
+			return 0;
+		}
 	}
-
-	return 0;
 }
+
+
+
+/**
+ * Overrides the block in the VFS file from this instance's FSObject::block (FSBlock).
+ * Only this block is affected, it is not a general refreshing of the VFS.
+ * The position where to write is known through FSObject::block_pos.
+ * 
+ * | Returns 0 on success.
+ * | Returns 1 if the VFS could not be opened.
+ * | Returns 2 if the block_pos == 0 (nullptr for the VFS).
+ */
+int FSObject::override_vfs() const{
+	return this->refer_to.vfs_io().ask_writer().override_fsblock(this->block_pos, this->block);
+}
+
 
 
 // # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -74,10 +172,10 @@ int FSObject::reload_from_vfs(){
 // # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 
-FSObject::FSObject(FileSystem& fs): refer_to(fs){}
+FSObject::FSObject(FileSystem& fs): refer_to(fs), previous(nullptr){}
 
 
-FSObject::FSObject(FileSystem& fs, const FSBlock& bck, const FSPos& pos): block_pos(pos), block(bck), refer_to(fs){
+FSObject::FSObject(FileSystem& fs, const FSBlock& bck, const FSPos& pos): block_pos(pos), block(bck), refer_to(fs), previous(nullptr){
 	SystemName sn{this->block.id, this->block.extension};
 	this->system_name = sn.c_str();
 }

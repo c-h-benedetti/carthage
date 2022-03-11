@@ -27,5 +27,8 @@ using FSTime = fs::file_time_type;
 /// Path compatible with all OS.
 using Path = fs::path;
 
+#define FIRST_BLOCK_POSITION sizeof(FSize)
+
+int touch(const Path& path);
 
 #endif // GENERAL_UTILS_HPP_INCLUDED

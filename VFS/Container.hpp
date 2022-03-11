@@ -5,38 +5,31 @@
 #include <vector>
 #include <functional>
 
+
 class Container : public FSObject{
 
 protected:
 
-	template <size_t T>
-	FSPos blank_segments() const;
-
-	template <size_t N>
-	int create_element(FSBlock& blc, std::function<FSObject(const Path&, const FSPos&)>& instanciating,	std::vector<FSObject>& collection);
-
-	Path make_path(FSBlock& b) const;
-	int linking_segment(const FSPos& insert);
-	bool name_exists(const Name& n, const Extension& ext);
-	int collect_content(std::vector<FSObject>& segment);
+	int create_element(const FSize& count, FSBlock& blc, std::function<void(const Path&, const FSPos&)>& instanciating);
 	virtual void dispatch(const std::vector<FSObject>& segment) = 0;
-	const Path& vfs_path() const;
+	int link_segment(const FSPos& insert);
 	
 public:
 
-	void load() override;
+	bool name_exists(const Name& n, const Extension& ext) const;
+	int load() override;
 
+	
 	virtual size_t size() const = 0;
 	virtual const FSObject& at(const size_t& i) const = 0;
-	inline const FSObject& operator[](const size_t& i){ return this->at(i); }
 
-	virtual bool accept_files() const = 0;
-	virtual bool accept_folders() const = 0;
-	virtual bool accept_versionables() const = 0;
+	virtual bool accepts_files() const = 0;
+	virtual bool accepts_folders() const = 0;
+	virtual bool accepts_versionables() const = 0;
 
-	virtual void new_file(const ArgsNewFile& fs) = 0;
-	virtual void new_folder(const ArgsNewFolder& fs) = 0;
-	virtual void new_versionable(const ArgsNewVersionable& fs) = 0;
+	virtual int create_file(const ArgsNewFile& args) = 0;
+	virtual int create_folder(const ArgsNewFolder& args) = 0;
+	virtual int create_versionable(const ArgsNewVersionable& args) = 0;
 
 	Container() = delete;
 	Container(FileSystem& fs);
@@ -47,7 +40,5 @@ public:
 
 };
 
-
-#include "Container.tpp"
 
 #endif // VFS_CONTAINER_HPP_INCLUDED

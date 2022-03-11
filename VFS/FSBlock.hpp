@@ -53,8 +53,6 @@ public:
 	/// ID of the group of this object. 0 reserved for no group.
 	UID group = 0;
 
-	void after_reading();
-	void before_writting();
 
 	FSBlock(){
 		this->id.nullify();

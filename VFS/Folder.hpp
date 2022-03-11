@@ -3,7 +3,9 @@
 
 #include "Container.hpp"
 
-// IMPROVE: [Folder] Make iterators to iterate through one type of flag in the content.
+class File;
+class Versionable;
+
 
 class Folder : public Container{
 
@@ -17,20 +19,25 @@ protected:
 
 public:
 
+	int open() override;
+
 	inline size_t size() const override{ return this->content.size(); }
 	inline const FSObject& at(const size_t& i) const override{ return this->content[i]; }
+	inline Versionable& versionable(){ return *((Versionable*)this->previous); }
+	inline bool is_versionable() const { 
+		if (current_raised(this->block.flag) || version_raised(this->block.flag)){
+			return (this->previous && versionable_raised(this->previous->get_data().flag)); 
+		}
+		return false;
+	}
 
-	bool accept_files() const override{ return true; }
-	bool accept_folders() const override{ return true; }
-	// IMPROVE: [Folder] Modify the code that blocks the creation of a Versionable in a Versionable.
-	bool accept_versionables() const override;
+	bool accepts_files() const override{ return true; }
+	bool accepts_folders() const override{ return true; }
+	bool accepts_versionables() const override;
 
-	void new_file(const ArgsNewFile& args) override;
-	void new_folder(const ArgsNewFolder& args) override;
-	void new_versionable(const ArgsNewVersionable& fs) override;
-
-	void join(Path& p) override;
-	void unjoin(Path& p) override;
+	int create_file(const ArgsNewFile& args) override;
+	int create_folder(const ArgsNewFolder& args) override;
+	int create_versionable(const ArgsNewVersionable& fs) override;
 
 	Folder() = delete;
 	Folder(FileSystem& fs);

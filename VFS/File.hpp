@@ -5,9 +5,11 @@
 
 class File : public FSObject{
 
-	void load() override;
+	int load() override;
 
 public:
+
+	int open() override;
 
 	File() = delete;
 	File(FileSystem& fs);
