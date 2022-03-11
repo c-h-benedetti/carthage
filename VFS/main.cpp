@@ -41,125 +41,8 @@ autre software pour les transformer en un .mp4.
 */
 
 
-// IMPROVE: [General] Instead of sending errors to std::cerr, we should use a global stream for logs.
-// IMPROVE: [General] Make functions to manipulate the VFS instead of manipulation des std::fstream all the time. These functions could at least handle the endianness of the size of the segment and the next pointer.
-
 // DEBUG: [General] Make a debug mode with preprocessor blocks.
-// DEBUG: [General] Make a function inspecting the VFS linearly block by block.
-/*
-void test_vfs_1(FileSystem& vfs){
 
-	ArgsNewFolder anF1;
-	anF1.name = "Mon Dossier";
-	anF1.icon = 4;
-
-	ArgsNewFolder anF2;
-	anF2.name = "Autre Dossier";
-	anF2.icon = 5;
-
-	ArgsNewFile anf1;
-	anf1.name = "Premier Fichier";
-	anf1.extension = "txt";
-	anf1.icon = 6;
-
-	ArgsNewFile anf2;
-	anf2.name = "Autre Fichier";
-	anf2.extension = "txt";
-	anf2.icon = 7;
-
-	if (vfs.folder()){
-		std::cerr << "The current obj is a Folder" << std::endl;
-		if (vfs.folder()->accept_folders()){
-			vfs.folder()->new_folder(anF1);
-			vfs.open(vfs.folder()->at(0));
-
-			vfs.folder()->new_folder(anF2);
-			vfs.open(vfs.folder()->at(0));
-
-			vfs.folder()->new_file(anf1);
-			vfs.folder()->new_file(anf2);
-			vfs.open(vfs.folder()->at(0));
-		}
-	}
-	else if (vfs.versionable()){
-		std::cerr << "The current obj is a Versionable" << std::endl;
-	}
-	else{
-		std::cerr << "The current obj has an unknown type" << std::endl;
-	}
-}
-
-
-void test_vfs_2(FileSystem& vfs){
-	ArgsNewFolder F1;
-	F1.name = "F1";
-	F1.icon = 4;
-
-	ArgsNewFolder F2;
-	F2.name = "F2";
-	F2.icon = 5;
-
-	ArgsNewFolder F3;
-	F3.name = "F3";
-	F3.icon = 6;
-
-	ArgsNewFile f1;
-	f1.name = "f1";
-	f1.extension = "txt";
-	f1.icon = 7;
-
-	ArgsNewFile f2;
-	f2.name = "f2";
-	f2.extension = "txt";
-	f2.icon = 7;
-
-	vfs.current()->new_folder(F2);
-	vfs.open(vfs.current()->at(0));
-	vfs.current()->new_folder(F3);
-	vfs.current()->new_file(f2);
-	vfs.previous();
-	vfs.current()->new_folder(F1);
-	vfs.open(vfs.current()->at(1));
-	vfs.current()->new_file(f1);
-}
-
-// IMPROVE [FileSystem]: What happens in we try to call open with an index out of range, or 0 on an empty Container?
-
-void test_vfs_3(FileSystem& vfs){
-
-	for (size_t i = 0 ; i < 50000 ; i++){
-
-		int c = rand() % 5;
-
-		if (c == 0){ // Opening content
-			if (vfs.current()->size() > 0){
-				vfs.open(vfs.current()->at(rand() % vfs.current()->size()));
-			}
-		}
-		else if (c == 1){ // previous
-			vfs.previous();
-		}
-		else if (c == 2){ // next
-			vfs.next();
-		}
-		else if (c == 3){ // new file
-			ArgsNewFile fi;
-			fi.icon = 0;
-			fi.extension = ".txt";
-			ID id(1);
-			fi.name = id.c_str();
-			vfs.current()->new_file(fi);
-		}
-		else if (c == 4){ // new folder
-			ArgsNewFolder fo;
-			fo.icon = 0;
-			ID id(1);
-			fo.name = id.c_str();
-			vfs.current()->new_folder(fo);
-		}
-	}
-}
-*/
 
 void display_block(const FSBlock& block){
 	
@@ -176,7 +59,7 @@ void display_block(const FSBlock& block){
 		std::cout << "    \"Extension\": \"" << block.extension << "\"" << ", " << std::endl;
 	}
 
-	std::cout << "    \"Parent\": " << block.parent<< std::endl;
+	std::cout << "    \"Parent\": " << block.parent << ", " << std::endl;
 	
 }
 
@@ -194,10 +77,12 @@ void inspect_vfs(FileSystem& vfs){
 		else{
 			std::cout << "  ,{" << std::endl;
 		}
+		std::cout << "  \"Segment Size\": " << seg_size << ", " << std::endl;
 		std::cout << "  \"Blocks\":  [" << std::endl;
 		for (size_t i = 0 ; i < seg_size ; i++){
 			std::cout << "    {" << std::endl;
 			display_block(blocks[i]);
+			std::cout << "    \"Position\": " << pos + i * sizeof(FSBlock) << std::endl;
 			if (i < seg_size - 1){
 				std::cout << "    }," << std::endl;
 			}
@@ -206,11 +91,32 @@ void inspect_vfs(FileSystem& vfs){
 			}			
 		}
 		std::cout << "  ]," << std::endl;
-		std::cout << "  \"Position\": " << pos << ", " << std::endl;
 		std::cout << "  \"Next\": " << next << std::endl;
 		std::cout << "  }" << std::endl;
 	});
 	std::cout << "]" << std::endl;
+}
+
+void cheat_inspect_vfs(FileSystem& vfs){
+
+	std::ifstream str(vfs.vfs_io().vfs_path);
+
+	FSize seg_size = 0;
+	FSBlock block;
+	FSPos next = 0;
+
+	while (str.peek() != EOF){
+		str.read((char*)&seg_size, sizeof(FSize));
+		str.read((char*)&block, sizeof(FSBlock));
+		str.read((char*)&next, sizeof(FSPos));
+
+		std::cout << "Size: " << seg_size << std::endl;
+		std::cout << "Name: " << block.name << ", Parent: " << block.parent << ", Content: " << block.content << std::endl;
+		std::cout << "Next: " << next << std::endl;
+		std::cout << "========" << std::endl;
+	}
+
+	str.close();
 }
 
 
@@ -218,9 +124,11 @@ int main(int argc, char* argv[], char* env[]){
 	
 	srand(time(NULL));
 
-	FileSystem vfs("/tmp", true, "carthage");
+	FileSystem vfs("/tmp", true, "Carthage");
 
-	/*ArgsNewFolder anF1;
+	vfs.current()->override_vfs();
+
+	ArgsNewFolder anF1;
 	anF1.name = "F1";
 	anF1.icon = 3;
 	
@@ -231,9 +139,9 @@ int main(int argc, char* argv[], char* env[]){
 	ArgsNewFolder anF2;
 	anF2.name = "F2";
 	anF2.icon = 3;
-	vfs.current()->create_folder(anF2);*/
+	vfs.current()->create_folder(anF2);
 
-	// inspect_vfs(vfs);
+	inspect_vfs(vfs);
 
 
 	return 0;

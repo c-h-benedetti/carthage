@@ -1,9 +1,7 @@
 #include "InputBuffer.hpp"
 
 void InputBuffer::init(){
-	// AfterReading<int>::behavior = [](int& i){
-	// 	i *= 1;
-	// };
+
 }
 
 

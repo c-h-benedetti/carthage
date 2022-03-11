@@ -2,18 +2,6 @@
 
 void OutputBuffer::init(){
 
-	BeforeWriting<int>::behavior = [](int& i){
-		i *= 1;
-	};
-
-	BeforeWriting<char>::behavior = [](char& i){
-		i *= 1;
-	};
-
-	BeforeWriting<float>::behavior = [](float& i){
-		i *= 1;
-	};
-
 }
 
 OutputBuffer::OutputBuffer(){

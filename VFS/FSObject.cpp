@@ -55,19 +55,16 @@ Path FSObject::data_path(int* check) const{
 	Path path = "";
 	int status = 0;
 
-	std::cout << "A" << std::endl;
 	std::vector<const FSObject*> list;
 	list.push_back(this);
 	FSObject* prev = this->previous;
 
-	std::cout << "B" << std::endl;
 	// DEBUG: [FSObject] Check que root n'est rencontré qu'une fois, que le previous de la root est nullptr.
 	while (prev){
 		list.push_back(prev);
 		prev = prev->previous;
 	}
 
-	std::cout << "C" << std::endl;
 	// 2. If the last recorded object is not the root, the path won't be valid, we can abort.
 	if (!root_raised(list.back()->get_data().flag)){
 		status = 1;
@@ -76,16 +73,12 @@ Path FSObject::data_path(int* check) const{
 		// 3. Assembling the path.
 		path = this->refer_to.vfs_io().user_root;
 		// IMPROVE: [FSObject] Check if a way exists to reserve some place for the path.
-		std::cout << "E" << std::endl;
-		std::cout << "SIZE: " << list.size() << std::endl;
 		size_t l_size = list.size();
 		for (size_t i = 0 ; i < l_size ; i++){
-			std::cout << "PREV: " << i << std::endl;
 			path /= list[l_size - i - 1]->get_system_name();
 		}
-		std::cout << "F" << std::endl;
 	}
-	std::cout << "D" << std::endl;
+
 	if (check){ *check = status; }
 
 	return path;
@@ -127,22 +120,17 @@ Path FSObject::deduce_path(int* check) const{
  * | Returns 3 if the block_pos == 0 (nullptr for the VFS).
  */
 int FSObject::reload_from_vfs(){
-	std::cout << "1" << std::endl;
 	int status = this->refer_to.vfs_io().ask_reader().probe_fsblock(this->block_pos, this->block);
 
 	if (status){
-		std::cout << "2" << std::endl;
 		return status;
 	}
 	else{
-		std::cout << "3" << std::endl;
 		// IMPROVE: [FSObject] If the object was deleted, the FileSystem must react and find a stable state.
 		if (removed_raised(this->block.flag)){
-			std::cout << "4" << std::endl;
 			return 20;
 		}
 		else{
-			std::cout << "5" << std::endl;
 			SystemName sn{this->block.id, this->block.extension};
 			this->system_name = sn.c_str();
 			return 0;

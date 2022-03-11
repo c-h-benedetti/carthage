@@ -42,7 +42,7 @@ int VFSReader::close(){
 constexpr bool is_big = std::endian::native == std::endian::big;
 
 void VFSReader::init(){
-	/*if (is_big){
+	if (is_big){
 		AfterReading<FSize>::behavior = [](FSize& i){
 			mirror_bytes<FSize>(i);
 		};
@@ -67,7 +67,7 @@ void VFSReader::init(){
 			mirror_bytes<UID>(b.owner);
 			mirror_bytes<UID>(b.group);
 		};
-	}*/
+	}
 }
 
 
@@ -288,7 +288,7 @@ int VFSWriter::close(){
 
 
 void VFSWriter::init(){
-	/*if (is_big){
+	if (is_big){
 		BeforeWriting<FSize>::behavior = [](FSize& i){
 			mirror_bytes<FSize>(i);
 		};
@@ -313,12 +313,13 @@ void VFSWriter::init(){
 			mirror_bytes<UID>(b.owner);
 			mirror_bytes<UID>(b.group);
 		};
-	}*/
+	}
 }
 
-
+// IMPROVE: [VFSWriter] Factorise the override_xxx() code with templates
 int VFSWriter::override_fsblock(const FSPos& pos, const FSBlock& block){
 	if (pos && !this->open()){
+		this->stream->seekp(pos);
 		FSBlock data = block;
 		BeforeWriting<FSBlock>::behavior(data);
 		this->stream->write((char*)&data, sizeof(FSBlock));
@@ -332,6 +333,7 @@ int VFSWriter::override_fsblock(const FSPos& pos, const FSBlock& block){
 	
 int VFSWriter::override_address(const FSPos& pos, const FSPos& next_val){
 	if (pos && !this->open()){
+		this->stream->seekp(pos);
 		FSPos data = next_val;
 		BeforeWriting<FSPos>::behavior(data);
 		this->stream->write((char*)&data, sizeof(FSPos));
@@ -345,6 +347,7 @@ int VFSWriter::override_address(const FSPos& pos, const FSPos& next_val){
 
 int VFSWriter::override_fsize(const FSPos& pos, const FSize& size){
 	if (pos && !this->open()){
+		this->stream->seekp(pos);
 		FSize data = size;
 		BeforeWriting<FSize>::behavior(data);
 		this->stream->write((char*)&data, sizeof(FSize));
@@ -360,7 +363,10 @@ int VFSWriter::blank_segments(const FSize& count, FSPos& insert){
 	const size_t b_size = sizeof(FSize) + sizeof(FSBlock) + sizeof(FSPos);
 	BasicBuffer<b_size> buffer;
 	FSize s = 1;
+	BeforeWriting<FSize>::behavior(s);
 	buffer.add<FSize>(s);
+	buffer.add<FSBlock>(FSBlock());
+	buffer.add<FSPos>(0);
 	this->buffer.reset();
 
 	for (size_t i = 0 ; i < count ; i++){
@@ -443,9 +449,9 @@ VFSWriter& VFSWriter::add_fspos(const FSPos& pos){
 }
 
 
-VFSWriter::VFSWriter(const Path& p, std::function<void()> c): vfs_path(p), callback(c){
+VFSWriter::VFSWriter(const Path& p, std::function<void()> c, const bool& reset): vfs_path(p), callback(c){
 	this->init();
-	if (!fs::exists(p)){
+	if (!fs::exists(p) || reset){
 		touch(p);
 	}
 }
@@ -480,12 +486,12 @@ VFSReader VFS_IO::ask_reader(){
 // La dequeue et ces fonctions vont devoir utiliser des mutex, on des condition variables.
 // Pour ne pas avoir à connaitre tous les types de tous les appelants, la queue sera une queue de lambda expression avec capture de contexte.
 // La fonction sera executée quand elle sera executée. L'appelant doit quand même rester bloqué jusqu'à ce que la requête soit terminée (pour la lecture en tous cas)
-VFSWriter VFS_IO::ask_writer(){
+VFSWriter VFS_IO::ask_writer(const bool& reset){
 	this->writers_count++;
 	
 	return VFSWriter(this->vfs_path, [&](){
 		this->writers_count--;
-	});
+	}, reset);
 }
 
 // IMPROVE: [VFS_IO] Create the empty elements here if they don't exist.

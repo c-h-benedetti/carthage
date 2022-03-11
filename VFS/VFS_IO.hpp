@@ -9,6 +9,17 @@
 #include "FSBlock.hpp"
 #include <vector>
 
+// IMPROVE: [VFSWriter][VFSReader] The embeded status should take its values from an enum class.
+// IMPROVE: [VFSWriter][VFSReader] The value of the status should always be check before any operation. Abort it if necessary.
+// IMPROVE: [VFSWriter][VFSReader] The buffer should be an object instanciated in the local scope of methods, it should be removed from the instance scope.
+// IMPROVE: [VFSWriter][VFSReader] The open() methods should be summoned from the constructor, the close() method from the destructor.
+
+/**
+ * Object responsible for reading operations on the VFS.
+ * This class is supposed to handle error codes and generate a final status.
+ * The implementation is made in a way that the VFS should always be left in a stable way.
+ * The callback lambda-expresion links the reader's life to the VFS_IO that issued it.
+ */
 class VFSReader {
 
 	int state = 0;
@@ -30,17 +41,23 @@ private:
 
 public:
 
+	// IMPROVE: [VFSWriter][VFSReader] These functions can be refactorized into a unique one with a template type.
+	// Opens the VFS and moves the head to the position #p. Meant to be used as a chained operation. (vfs.sequence(0).read_xxx().read_xxx().status();)
 	VFSReader& sequence(const FSPos& p);
 	VFSReader& read_fsize(FSize& s);
 	VFSReader& read_fsblock(FSBlock& b);
 	VFSReader& read_fspos(FSPos& p);
 	inline int status() const{ return this->state; }
 
+	/// Browses the VFS linearly segment by segment, ignoring the hierarchy.
 	int linear_browsing(std::function<void(const FSize&, const FSBlock*, const FSPos&, const FSPos&)> f);
+
 	/// Browses the content of a Container. #cont_pos is the position of the content (FSBlock::content).
 	int browse_block_content(const FSPos& cont_pos, std::function<void(const FSize&, const FSBlock*, const FSPos&, const FSPos&)> f);
+
 	/// Reads the FSBlock located at #pos in the VFS.
 	int probe_fsblock(const FSPos& pos, FSBlock& block);
+
 	/// Browses the FSBlock::parent field until the root. Includes the summoner's block (at pos)
 	int backtrack(std::vector<FSBlock>& blocks, const FSPos& pos);
 
@@ -53,8 +70,6 @@ public:
 
 // + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + +
 
-// Add a variable representing the failure or anything
-// Add a function status() that enables to return the status after a sequence
 class VFSWriter {
 
 	int state = 0;
@@ -81,13 +96,12 @@ public:
 	int override_address(const FSPos& pos, const FSPos& next_val);
 	int override_fsize(const FSPos& pos, const FSize& size);
 
-	/// !! Inserts #count blank segments of size 1 by the end of the VFS.
+	/// Inserts #count blank segments of size 1 by the end of the VFS.
 	int blank_segments(const FSize& count, FSPos& insert);
-	/// !! Inserts a blank segment containing #count FSBlocks by the end of the VFS.
+	/// Inserts a blank segment containing #count FSBlocks by the end of the VFS.
 	int blank_segment(const FSize& count, FSPos& insert);
 
-	// sequence(0) opens a stream, does a seekp(0) and returns
-	// add this same methods for reading ?
+
 	VFSWriter& sequence(const FSPos& pos);
 	VFSWriter& add_fsize(const FSize& size);
 	VFSWriter& add_fsblock(const FSBlock& blc);
@@ -95,7 +109,7 @@ public:
 	inline int status() const{ return this->state; }
 
 	VFSWriter() = delete;
-	VFSWriter(const Path& p, std::function<void()> c);
+	VFSWriter(const Path& p, std::function<void()> c, const bool& reset=false);
 
 	~VFSWriter();
 };
@@ -135,7 +149,7 @@ public:
 public:
 
 	VFSReader ask_reader();
-	VFSWriter ask_writer();
+	VFSWriter ask_writer(const bool& reset=false);
 
 	// Concatenation of base_path and the name built from the block
 	Path make_path(const Path& base_path, FSBlock& block);

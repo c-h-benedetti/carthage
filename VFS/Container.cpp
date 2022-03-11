@@ -37,7 +37,6 @@ int Container::create_element(const FSize& count, FSBlock& blc, std::function<vo
 	if (this->name_exists(blc.name, blc.extension)){
 		return 1;
 	}
-	std::cout << "a" << std::endl;
 	
 	// 2. Reserving segment(s) by the end of the VFS that will contain the new elements.
 	FSPos insert = 0;
@@ -45,33 +44,32 @@ int Container::create_element(const FSize& count, FSBlock& blc, std::function<vo
 	if (this->refer_to.vfs_io().ask_writer().blank_segments(count, insert) || !insert){
 		return 2;
 	}
-	std::cout << "b" << std::endl;
+	
 	// 3. Building the path according to the data in the new block.
 	int status;
 	Path abs_path = this->data_path(&status);
-	std::cout << "c" << std::endl;
+	
 	if (status){
 		abs_path = this->deduce_path(&status);
 	}
-	std::cout << "d" << std::endl;
+	
 	if (status || !fs::exists(abs_path)){
 		return 3;
 	}
-	std::cout << "e" << std::endl;
+	
 	abs_path = this->refer_to.vfs_io().make_path(abs_path, blc);
-	std::cout << "f" << std::endl;
+	
 	// 4. Executing operations specific to a type of objects (like creating the block).
 	instanciating(abs_path, insert);
-	std::cout << "g" << std::endl;
+
 	// 5. Writing blocks into the VFS
 
 	// IMPROVE: [Container] Handle linking error codes.
 	this->link_segment(insert);
-	std::cout << "h" << std::endl;
+
 	if (this->override_vfs()){
 		return 4;
 	}
-	std::cout << "i" << std::endl;
 
 	return 0;
 }
