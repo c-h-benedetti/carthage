@@ -22,6 +22,7 @@ enum class FSType : FlagType{
 	VERSION = 1 << 6
 };
 
+inline bool is_undefined(const FSType& f){ return static_cast<int>(f) == 0; }
 inline bool root_raised(const FSType& f){ return static_cast<FlagType>(FSType::ROOT) & static_cast<FlagType>(f); }
 inline bool removed_raised(const FSType& f){ return static_cast<FlagType>(FSType::REMOVED) & static_cast<FlagType>(f); }
 inline bool file_raised(const FSType& f){ return static_cast<FlagType>(FSType::FILE) & static_cast<FlagType>(f); }

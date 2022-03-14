@@ -5,6 +5,7 @@
 #include <vector>
 #include <functional>
 
+class VFSWriter;
 
 class Container : public FSObject{
 
@@ -12,7 +13,7 @@ protected:
 
 	int create_element(const FSize& count, FSBlock& blc, std::function<void(const Path&, const FSPos&)>& instanciating);
 	virtual void dispatch(const std::vector<FSObject>& segment) = 0;
-	int link_segment(const FSPos& insert);
+	int link_segment(const FSPos& insert, VFSWriter* writer=nullptr);
 	
 public:
 
@@ -21,7 +22,8 @@ public:
 
 	
 	virtual size_t size() const = 0;
-	virtual const FSObject& at(const size_t& i) const = 0;
+	virtual FSObject& at(const size_t& i) = 0;
+	virtual const FSObject& read(const size_t& i) const = 0;
 
 	virtual bool accepts_files() const = 0;
 	virtual bool accepts_folders() const = 0;

@@ -14,7 +14,7 @@ bool Container::name_exists(const Name& n, const Extension& ext) const{
 	bool found = false;
 
 	while ((i < this->size()) && !found){
-		found = (this->at(i).get_data().name == n) && (this->at(i).get_data().extension == ext);
+		found = (this->read(i).get_data().name == n) && (this->read(i).get_data().extension == ext);
 		i++;
 	}
 
@@ -106,7 +106,7 @@ int Container::load(){
  * | Returns 1 in case of failing to read from the VFS.
  * | Returns 2 in case of failing to write to the VFS.
  */
-int Container::link_segment(const FSPos& insert){
+int Container::link_segment(const FSPos& insert, VFSWriter* writer){
 	
 	if (this->block.content == 0){ // This object is an empty Container.
 		this->block.content = insert;
@@ -115,11 +115,18 @@ int Container::link_segment(const FSPos& insert){
 
 		FSPos last = 0;
 
+		// IMPROVE: [Container] Asking for a reader will be refused if a writer is passed as parameter.
+
 		this->refer_to.vfs_io().ask_reader().browse_block_content(this->block.content, [&](const FSize& size, const FSBlock* blocks, const FSPos& c_pos, const FSPos& next){
 			last = c_pos + (size * sizeof(FSBlock));
 		});
 
-		this->refer_to.vfs_io().ask_writer().override<FSPos>(last, insert);
+		if (writer){
+			writer->override<FSPos>(last, insert);
+		}
+		else{
+			this->refer_to.vfs_io().ask_writer().override<FSPos>(last, insert);
+		}
 	}
 
 	return 0;

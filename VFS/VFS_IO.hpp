@@ -4,10 +4,11 @@
 #include <fstream>
 #include <memory>
 #include <functional>
+#include <vector>
+#include <deque>
 #include "InputBuffer.hpp"
 #include "OutputBuffer.hpp"
 #include "FSBlock.hpp"
-#include <vector>
 
 
 enum VFSError: int{
@@ -51,6 +52,8 @@ private:
 
 public:
 
+	inline std::ifstream& get_stream(){ return *(this->stream); }
+
 	/// Reads an object of type T from the current stream at the current position. Meant to be used chained with VFSReader::sequence().
 	template <typename T>
 	VFSReader& read(T& t);
@@ -72,6 +75,25 @@ public:
 
 	/// Browses the FSBlock::parent field until the root. Includes the summoner's block (at #pos)
 	int backtrack(std::vector<FSBlock>& blocks, const FSPos& pos);
+
+	/// Recursively browses the whole hierarchy from the given block. #root_pos is a block address.
+	/*void recursive_hierarchy(
+		size_t depth, 
+		const FSBlock& block, 
+		const Path& p, 
+		std::function<void(const FSBlock&, const size_t&, const Path&)>& f,
+		std::function<void(const FSBlock&, const size_t&, const Path&, const std::vector<FSBlock>& content)>& f2
+	);*/
+
+	/*int browse_hierarchy(
+		const FSPos& root_pos, 
+		std::function<void(const FSBlock&, const size_t&, const Path&)> f,
+		std::function<void(const FSBlock&, const size_t&, const Path&, const std::vector<FSBlock>& content)> f2
+	);*/
+
+	FSize fetch_level(const FSBlock& b, std::deque<FSBlock>& blocks);
+
+	void iterative_bfs_hierarchy(const FSPos& start);
 
 	VFSReader() = delete;
 	VFSReader(const Path& p, std::function<void()> c);
@@ -116,6 +138,13 @@ private:
 	void init();
 
 public:
+
+	inline std::ofstream& get_stream(){ return *(this->stream); }
+
+	inline FSPos head(){
+		this->stream->seekp(0, std::ios_base::end);
+		return this->stream->tellp();
+	}
 
 	/// Writes an object of type T at the #pos position in the VFS.
 	template <typename T>

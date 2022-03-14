@@ -22,7 +22,8 @@ public:
 	int open() override;
 
 	inline size_t size() const override{ return this->content.size(); }
-	inline const FSObject& at(const size_t& i) const override{ return this->content[i]; }
+	inline FSObject& at(const size_t& i) override{ return this->content[i]; }
+	inline const FSObject& read(const size_t& i) const override{ return this->content[i]; }
 	inline Versionable& versionable(){ return *((Versionable*)this->previous); }
 	inline bool is_versionable() const { 
 		if (current_raised(this->block.flag) || version_raised(this->block.flag)){

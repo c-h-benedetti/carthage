@@ -197,6 +197,114 @@ int VFSReader::backtrack(std::vector<FSBlock>& blocks, const FSPos& pos){
 	}
 }
 
+/*
+void VFSReader::recursive_hierarchy(
+	size_t depth, 
+	const FSBlock& block, 
+	const Path& p, 
+	std::function<void(const FSBlock&, const size_t&, const Path&)>& f,
+	std::function<void(const FSBlock&, const size_t&, const Path&, const std::vector<FSBlock>& content)>& f2
+){
+	f(block, depth, p);
+	if (block.content){
+		std::vector<FSBlock> blocks;
+		FSPos c_pos = block.content;
+		FSPos start_pos = c_pos;
+		FSize size = 0;
+		InputBuffer buffer;
+
+		while(c_pos){
+			this->stream->seekg(c_pos);
+			this->read<FSize>(size);
+			FSBlock read_blocks[size];
+			blocks.reserve(blocks.size() + size);
+			buffer.reset();
+			buffer.read_from(*(this->stream), sizeof(FSBlock) * size + sizeof(FSPos));
+
+			for (size_t i = 0 ; i < size ; i++){
+				blocks.push_back(FSBlock());
+				buffer.get<FSBlock>(blocks.back());
+			}
+
+			buffer.get<FSPos>(c_pos);
+		}
+
+		f2(block, depth, p, blocks);
+
+		for(const FSBlock& blc : blocks){
+			SystemName sn{block.id};
+			this->recursive_hierarchy(depth+1, blc, p / sn.c_str(), f, f2);
+		}
+	}
+}
+
+
+int VFSReader::browse_hierarchy(
+	const FSPos& root_pos, 
+	std::function<void(const FSBlock&, const size_t&, const Path&)> f,
+	std::function<void(const FSBlock&, const size_t&, const Path&, const std::vector<FSBlock>& content)> f2
+){
+	if (this->state){
+		return this->state;
+	}
+	else{
+		
+		this->stream->seekg(root_pos);
+		FSBlock block;
+		this->read<FSBlock>(block);
+
+		SystemName sn{block.id};
+		this->recursive_hierarchy(0, block, sn.c_str(), f, f2);
+
+		return 0;
+	}
+}
+*/
+
+FSize VFSReader::fetch_level(const FSBlock& b, std::deque<FSBlock>& blocks){
+	FSize total = 0;
+	if (b.content > 0){
+		this->browse_block_content(b.content, [&](const FSize& seg_size, const FSBlock* blcs, const FSPos& stt, const FSPos& next){
+			for (size_t i = 0 ; i < seg_size ; i++){
+				if (!removed_raised(blcs[i].flag)){
+					blocks.push_back(blcs[i]);
+					total++;
+					std::cout << b.name << "/" << blcs[i].name << std::endl;
+				}
+			}
+		});
+	}
+
+	return total;
+}
+
+
+void VFSReader::iterative_bfs_hierarchy(const FSPos& start){
+	FSBlock current;
+	this->sequence(start).read<FSBlock>(current);
+	std::deque<FSBlock> file;
+	std::deque<FSize> len_file;
+	file.push_back(current);
+	len_file.push_back(1);
+	FSize count = 0;
+
+	while (file.size() > 0){
+		current = file.front();
+		file.pop_front();
+		// Create the content of current here.
+		
+		// ---
+		len_file.push_back(fetch_level(current, file));
+		count++;
+
+		if (count >= len_file.front()){ // Changing of depth
+			std::cout << "===" << std::endl;
+			count = 0;
+			len_file.pop_front();
+		}
+	}
+}
+
 
 VFSReader::VFSReader(const Path& p, std::function<void()> c): vfs_path(p), callback(c){
 	this->init();

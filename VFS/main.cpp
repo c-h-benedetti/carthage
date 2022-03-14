@@ -121,36 +121,132 @@ void cheat_inspect_vfs(FileSystem& vfs){
 }
 
 
+/*
+
+- Après qu'on ait construit notre buffer avec replicate, est-il possible d'aller chercher les bons chemins pour faire
+les copies de fichiers? On a besoin de faire une copie que pour les fichiers, les dossiers peuvent être créés à la volée.
+
+
+- Comment déterminer si un objet est local ou non ? Les objets du VFS ne sont pas garantis d'exister sur le système.
+- On veut rajouter FSType::LINK pour pointer vers un autre objet. Toutes les actions faites sur cet objet doivent être
+répercutées sur l'original.
+
+*/
+
+/*
+
+The replicate_to() function works only for one element, but it must be completed by another function.
+The first function must copy in a single segment the level 0 of what's copied.
+Then, on each newly created element, the replicate_to() function must be called to make a recursive copy.
+With the path deduction, the method could be moved to Container instead of FileSystem.
+
+*/
+
 int main(int argc, char* argv[], char* env[]){
 	
 	srand(time(NULL));
 
-	FileSystem vfs("/tmp");
+	FileSystem vfs("/tmp", true, "Carthage");
 
-	/*ArgsNewFolder anF1;
+	ArgsNewFolder anF1;
 	anF1.name = "F1";
 	anF1.icon = 3;
+
+	Container* dest = vfs.current();
 	
 	if (vfs.current()->create_folder(anF1)){
-		std::cout << "FAILED" << std::endl;
+		std::cout << "FAILED 1" << std::endl;
 	}
 
 	ArgsNewFolder anF2;
 	anF2.name = "F2";
 	anF2.icon = 3;
-	vfs.current()->create_folder(anF2);*/
+	
+	if (vfs.current()->create_folder(anF2)){
+		std::cout << "FAILED 2" << std::endl;
+	}
+
 
 	ArgsNewFolder anF3;
 	anF3.name = "F3";
 	anF3.icon = 3;
-	vfs.current()->create_folder(anF3);
+	
+	if (vfs.current()->create_folder(anF3)){
+		std::cout << "FAILED 3.1" << std::endl;
+	}
+
+	if (vfs.current()->create_folder(anF3)){
+		std::cout << "FAILED 3.2" << std::endl;
+	}
+
+	vfs.current()->at(0).open();
+
+	if (vfs.current()->create_folder(anF1)){
+		std::cout << "FAILED 1" << std::endl;
+	}
+
+	if (vfs.current()->create_folder(anF2)){
+		std::cout << "FAILED 2" << std::endl;
+	}
+
+	if (vfs.current()->create_folder(anF3)){
+		std::cout << "FAILED 3.1" << std::endl;
+	}
+
+	FSObject src = vfs.current()->at(1);
+	vfs.current()->at(1).open();
+
+	if (vfs.current()->create_folder(anF1)){
+		std::cout << "FAILED 1" << std::endl;
+	}
+
+	if (vfs.current()->create_folder(anF2)){
+		std::cout << "FAILED 2" << std::endl;
+	}
+
+	if (vfs.current()->create_folder(anF3)){
+		std::cout << "FAILED 3.1" << std::endl;
+	}
+
+	std::cout << "reach" << std::endl;
+
+	vfs.replicate_to(src, dest, false, false);
+
+	std::cout << "passed" << std::endl;
 
 	vfs_to_json(vfs);
-
 
 	return 0;
 }
 
 
+/*
+The first block must be copied in an individual way because it can be part of another segment, if several elements
+have to be copied (not from a common root).
+
+Il faut check que la source n'est pas préfixe de la destination.
+
+Si un versionable est trouvé dans la hiérarchie, vérifier qu'il peut être copié.
+=> Pour annuler l'opération, retirer le pointeur de contenu est assez. Si rien ne pointe sur les blocks corrompus
+ils seront laissés où ils sont.
+*/
+
+
+
+
 // DEBUG [General]: Control that we are always in the range of a FSize when we add an element in a Container.
+
+/*
+
+IMPLEMENT:
+
+- [ ] The copy operation
+- [ ] The prev_stack and next_stack operations
+- [ ] Operations specific to Versionable
+- [ ] Refresh the implementation of the "hierarchy to HTML" method.
+- [ ] The defragmentation method.
+
+*/
+
+
 

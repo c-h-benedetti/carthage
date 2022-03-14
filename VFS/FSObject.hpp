@@ -43,6 +43,7 @@ public:
 	// ~ ~ > Getters
 
 	inline const FSBlock& get_data() const{ return this->block; }
+	inline FSBlock& edit_data(){ return this->block; }
 	inline const Path& get_system_name() const { return this->system_name; }
 	inline const Container* get_previous() const{ return this->previous; }
 
