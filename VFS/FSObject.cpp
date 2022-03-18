@@ -150,7 +150,7 @@ int FSObject::reload_from_vfs(){
  * | Returns 2 if the block_pos == 0 (nullptr for the VFS).
  */
 int FSObject::override_vfs() const{
-	return this->refer_to.vfs_io().ask_writer().override<FSBlock>(this->block_pos, this->block);
+	return this->refer_to.vfs_io().ask_writer().override<FSBlock>(this->block_pos, this->block).status();
 }
 
 
@@ -163,7 +163,7 @@ int FSObject::override_vfs() const{
 FSObject::FSObject(FileSystem& fs): refer_to(fs), previous(nullptr){}
 
 
-FSObject::FSObject(FileSystem& fs, const FSBlock& bck, const FSPos& pos): block_pos(pos), block(bck), refer_to(fs), previous(nullptr){
+FSObject::FSObject(FileSystem& fs, const FSBlock& bck, const FSPos& pos, Container* link): block_pos(pos), block(bck), refer_to(fs), previous(link){
 	SystemName sn{this->block.id, this->block.extension};
 	this->system_name = sn.c_str();
 }

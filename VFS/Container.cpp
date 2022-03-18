@@ -41,7 +41,7 @@ int Container::create_element(const FSize& count, FSBlock& blc, std::function<vo
 	// 2. Reserving segment(s) by the end of the VFS that will contain the new elements.
 	FSPos insert = 0;
 
-	if (this->refer_to.vfs_io().ask_writer().blank_segments(count, insert) || !insert){
+	if (this->refer_to.vfs_io().ask_writer().blank_segments(count, insert).status() || !insert){
 		return 2;
 	}
 	

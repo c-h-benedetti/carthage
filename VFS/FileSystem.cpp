@@ -3,6 +3,7 @@
 #include "Versionable.hpp"
 #include <fstream>
 #include <string>
+#include <utility>
 
 // IMPROVE: [FileSystem] Update the content of this block along the implementation of new features
 
@@ -93,106 +94,135 @@ static Path join(const std::vector<Path>& paths){
 }
 
 
-void FileSystem::create(const FSBlock& src_block, const Path& src_path, const Path& dst_path){
-	if (file_raised(src_block.flag)){
+void FileSystem::create(const FSObject& src, const Path& src_path, const Path& dst_path){
+
+	if (file_raised(src.get_data().flag)){
 		fs::copy_file(src_path, dst_path);
 	}
-	else if(folder_raised(src_block.flag)){
+	else if(folder_raised(src.get_data().flag)){
 		fs::create_directory(dst_path);
 	}
-	else if(versionable_raised(src_block.flag)){
+	else if(versionable_raised(src.get_data().flag)){
 		fs::create_directory(dst_path);
 	}
 }
 
-// IMPROVE: [FileSystem] We must be able to provide a writer and a reader at the same time. We will certainly have to make a system of partial locking for writing, with a range of bytes. In this case, we can issue several writers if they are on different ranges. Of the same way, readers can be issued if writers exist in the case where the range is not the same. A mutex must be locked the time that the VFS_IO takes its decision.
-void FileSystem::replicate_to(const FSObject& source, Container* dest, const bool& deduce_src, const bool& deduce_dst){
-	// 1. The destination must exist
+/**
+ * This function copies all blocks in #source to #dest.
+ * A test is performed to verify that #dest accepts each block.
+ * The recursive copy is launched after the segment was created.
+ */
+void FileSystem::copy_to(std::vector<FSObject>& sources, Container* dest){
+	
 	if (!dest){
 		return;
 	}
 
-	// 2. Building path, either by following pointers or from the VFS.
-	// => Path of the source
-	Path src_path = "";
-	if (deduce_src){
-		src_path = source.deduce_path();
-	}
-	else{
-		src_path = source.data_path();
-	}
-	src_path = src_path.parent_path(); // Not very clean ?
+	std::vector<std::pair<FSObject, FSObject>> orig_and_copies;
 
-	// => Path where to create new objects
-	Path dst_path = "";
-	if (deduce_dst){
-		dst_path = dest->deduce_path();
+	// Filtering objects that the destination could refuse.
+	for (size_t i = 0 ; i < sources.size() ; i++){
+		
+		FSObject& orig = sources[i];
+		orig.reload_from_vfs();
+
+		if (is_valid(orig.get_data().flag)){
+			FSBlock copy_data = orig.get_data();
+			
+			copy_data.id.randomize();
+			copy_data.parent = dest->block_pos;
+			copy_data.content = 0;
+
+			FSObject copy(*this, copy_data, 0);
+			copy.chain(dest);
+
+			orig_and_copies.push_back({orig, copy});
+			this->create(orig, orig.data_path(), copy.data_path());
+		}
 	}
-	else{
-		dst_path = dest->data_path();
+
+	FSPos head = 0;
+	this->io_manager.ask_writer().blank_segment(orig_and_copies.size(), head);
+	OutputBuffer buffer;
+
+	// Creating the new segment, and writing it to the VFS.
+	buffer.add<FSize>(orig_and_copies.size());
+	for (size_t i = 0 ; i < orig_and_copies.size() ; i++){
+		std::pair<FSObject, FSObject>& obj = orig_and_copies[i];
+		obj.second.set_pos(head + sizeof(FSize) + i * sizeof(FSBlock));
+		buffer.add<FSBlock>(obj.second.get_data());
 	}
+	buffer.add<FSPos>(0);
 	
-	// 3. Copying first block to the destination
-	// => Opening a writer and keeping it active until the end.
-	VFSWriter writer = this->io_manager.ask_writer();
-	FSPos head = writer.head();
-	FSPos insert = head;
+	this->io_manager.ask_writer().sequence(head).write_to_vfs(buffer);
+	dest->link_segment(head);
 
-	// 4. Replicating the fisrt object
-	FSObject dst = FSObject(*this, source.get_data(), head + sizeof(FSize));
-	dst.edit_data().parent = dest->block_pos;
-	dst.edit_data().id.randomize();
+	for (size_t i = 0 ; i < orig_and_copies.size() ; i++){
 
-	OutputBuffer init_buff;
-	init_buff.add<FSize>(1).add<FSBlock>(dst.get_data()).add<FSPos>(0);
-	init_buff.write_to(writer.get_stream());
+		std::pair<FSObject, FSObject>& objs = orig_and_copies[i];
 
-	head += (sizeof(FSize) + sizeof(FSBlock) + sizeof(FSPos));
+		if (folder_raised(objs.second.get_data().flag)){
+			dest->edit_data().nb_folders++;
+		}
+		else if (versionable_raised(objs.second.get_data().flag)){
+			dest->edit_data().nb_versionables++;
+		}
+		else{
+			dest->edit_data().nb_files++;
+		}
+
+		this->replicate_to(objs.first, objs.second);
+	}
+
+	dest->override_vfs();
+}
+
+
+// IMPROVE: [FileSystem] We must be able to provide a writer and a reader at the same time. We will certainly have to make a system of partial locking for writing, with a range of bytes. In this case, we can issue several writers if they are on different ranges. Of the same way, readers can be issued if writers exist in the case where the range is not the same. A mutex must be locked the time that the VFS_IO takes its decision.
+void FileSystem::replicate_to(const FSObject& source, FSObject& dst){
 
 	// = = Check que la destination accepte le type de la source = =
-	
 
-	// = = = = = = = = = = = = = = = = = = = = = = = = = =
+	std::vector<std::pair<FSObject, FSObject>> stack;
+	FSPos insert = 0;
 
-	std::vector<FSObject> stack;
-	std::vector<FSObject> copies;
+	stack.push_back({
+		source,
+		dst
+	});
 
-	stack.push_back(source);
-	copies.push_back(FSObject(*this, dst.get_data(), 0));
+	Path path_src = source.data_path();
+	path_src = path_src.parent_path();
 
-	std::vector<Path> partial_path_src;
-	std::vector<Path> partial_path_dst;
+	Path path_dst = dst.data_path();
 
 	while (stack.size() > 0){
-		FSObject current = stack[stack.size()-1];
+		FSObject current = stack.back().first;
+		FSObject current_dup = stack.back().second;
 		stack.pop_back();
-		FSObject current_dup = copies[copies.size()-1];
-		copies.pop_back();
 
 		if (is_undefined(current.get_data().flag)){
-			partial_path_dst.pop_back();
-			partial_path_src.pop_back();
+			path_src = path_src.parent_path();
+			path_dst = path_dst.parent_path();
 		}
 		else{
 
-			// = = Process here = =
-
 			SystemName sn_src{current.get_data().id};
-			partial_path_src.push_back(sn_src.c_str());
-
 			SystemName sn_dst{current_dup.get_data().id};
-			partial_path_dst.push_back(sn_dst.c_str());
 
-			Path current_src_path = this->io_manager.user_root / join(partial_path_src);
-			Path current_dst_path = this->io_manager.user_root / join(partial_path_src);
+			path_src /= sn_src.c_str();
+			path_dst /= sn_dst.c_str();
 
-			create(current.get_data(), current_src_path, current_dst_path);
+			this->create(current, path_src, path_dst);
 
 			// = = = = = = = = = = =
 
-			stack.push_back(FSObject(*this, FSBlock(), 0)); // Délimiteur
-			copies.push_back(FSObject(*this, FSBlock(), 0)); // Délimite
+			stack.push_back({ // Délimiteur
+				FSObject(*this, FSBlock(), 0),
+				FSObject(*this, FSBlock(), 0)
+			});
 
+			// If the element doesn't contain anything (file or empty folder) we don't need to probe anything.
 			if (current.get_data().content){
 				bool at_least_once = false;
 				std::vector<FSObject> collected;
@@ -200,38 +230,56 @@ void FileSystem::replicate_to(const FSObject& source, Container* dest, const boo
 				this->io_manager.ask_reader().browse_block_content(current.get_data().content, [&](const FSize& seg_size, const FSBlock* blocks, const FSPos& c_pos, const FSPos& next){
 					for (size_t i = 0 ; i < seg_size ; i++){
 						if (!removed_raised(blocks[i].flag)){
-							if (!at_least_once){
-								at_least_once = true;
-								current_dup.edit_data().content = head;
-							}
-							// Rafraichir les compteurs ici aussi
-							stack.push_back(FSObject(*this, blocks[i], c_pos + i * sizeof(FSBlock)));
-							collected.push_back(FSObject(*this, blocks[i], sizeof(FSize) + head + i * sizeof(FSBlock)));
+							at_least_once = true;
+							collected.push_back(
+								FSObject(*this, blocks[i], c_pos + i * sizeof(FSBlock), (Container*)&current)
+							);
 						}
 					}
 				});
 
+				FSPos head = 0;
+				this->io_manager.ask_writer().blank_segment(collected.size(), head);
+				
+				if (!insert){
+					insert = head;
+				}
+
+				if (at_least_once){
+					current_dup.edit_data().content = head;
+				}
+
 				OutputBuffer buffer;
 				buffer.add<FSize>(collected.size());
 
-				for (FSObject& o : collected){ // System copies should happen in this loop.
-					o.edit_data().parent = current_dup.block_pos;
-					o.edit_data().id.randomize();
+				for (size_t i = 0 ; i < collected.size() ; i++){
+					FSBlock new_data = collected[i].get_data();
+					new_data.parent = current_dup.block_pos;
+					new_data.id.randomize();
+					new_data.content = 0;
+
+					FSObject o(*this, new_data, head + sizeof(FSize) + i * sizeof(FSBlock), (Container*)&current_dup);
+					
 					buffer.add<FSBlock>(o.get_data());
-					copies.push_back(o);
+
+					stack.push_back({
+						collected[i],
+						o
+					});
 				}
 
 				buffer.add<FSPos>(0);
-				buffer.write_to(writer.get_stream());
 
-				head += (sizeof(FSize) + sizeof(FSBlock) * collected.size() + sizeof(FSPos));
-				// Ecrire le segment qui vient d'être collecté
+				this->io_manager.ask_writer().sequence(head).write_to_vfs(buffer);
 				current_dup.override_vfs();
 			}
 		}
 	}
 
-	dest->link_segment(insert, &writer);
+	if (insert){
+		Container* c = (Container*) &dst;
+		c->link_segment(insert);
+	}
 }
 
 

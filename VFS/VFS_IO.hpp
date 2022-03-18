@@ -141,20 +141,25 @@ public:
 
 	inline std::ofstream& get_stream(){ return *(this->stream); }
 
-	inline FSPos head(){
+	inline VFSWriter& head(FSPos* pos = nullptr){
 		this->stream->seekp(0, std::ios_base::end);
-		return this->stream->tellp();
+		if (pos){
+			*pos = this->stream->tellp();
+		}
+		return *this;
 	}
 
 	/// Writes an object of type T at the #pos position in the VFS.
 	template <typename T>
-	int override(const FSPos& pos, const T& t);
+	VFSWriter& override(const FSPos& pos, const T& t);
+
+	VFSWriter& write_to_vfs(OutputBuffer& buffer);
 
 	/// Inserts #count blank segments of size 1 at the end of the VFS.
-	int blank_segments(const FSize& count, FSPos& insert);
+	VFSWriter& blank_segments(const FSize& count, FSPos& insert);
 
 	/// Inserts a blank segment containing #count FSBlocks at the end of the VFS.
-	int blank_segment(const FSize& count, FSPos& insert);
+	VFSWriter& blank_segment(const FSize& count, FSPos& insert);
 
 	/// Writes an object of type T in the current stream at the current position. Meant to be used chained with VFSWriter::sequence().
 	template <typename T>

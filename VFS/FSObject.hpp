@@ -43,9 +43,13 @@ public:
 	// ~ ~ > Getters
 
 	inline const FSBlock& get_data() const{ return this->block; }
-	inline FSBlock& edit_data(){ return this->block; }
 	inline const Path& get_system_name() const { return this->system_name; }
 	inline const Container* get_previous() const{ return this->previous; }
+
+	// ~ ~ > Setters
+
+	inline FSBlock& edit_data(){ return this->block; }
+	inline void set_pos(const FSPos& pos){ this->block_pos = pos; }
 
 	// ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
 	// ~    INSTANCIATION                                                            ~
@@ -53,7 +57,7 @@ public:
 
 	FSObject() = delete;
 	FSObject(FileSystem& fs);
-	FSObject(FileSystem& fs, const FSBlock& bck, const FSPos& pos);
+	FSObject(FileSystem& fs, const FSBlock& bck, const FSPos& pos, Container* link=nullptr);
 
 	// ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
 	// ~    EXTRAS                                                                   ~

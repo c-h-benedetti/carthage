@@ -379,10 +379,9 @@ void VFSWriter::init(){
 }
 
 
-int VFSWriter::blank_segments(const FSize& count, FSPos& insert){
+VFSWriter& VFSWriter::blank_segments(const FSize& count, FSPos& insert){
 	if (this->state || !count){
 		this->raise(VFSError::INVALID_COUNT);
-		return this->state;
 	}
 	else{
 		constexpr size_t b_size = sizeof(FSize) + sizeof(FSBlock) + sizeof(FSPos);
@@ -403,17 +402,16 @@ int VFSWriter::blank_segments(const FSize& count, FSPos& insert){
 		this->stream->seekp(0, std::ios_base::end);
 		insert = this->stream->tellp();
 		buffer.write_to(*(this->stream));
-
-		return 0;
 	}
+
+	return *this;
 }
 
 
-int VFSWriter::blank_segment(const FSize& count, FSPos& insert){
+VFSWriter& VFSWriter::blank_segment(const FSize& count, FSPos& insert){
 
 	if (this->state || !count){
 		this->raise(VFSError::INVALID_COUNT);
-		return this->state;
 	}
 	else{
 		OutputBuffer buffer;
@@ -430,9 +428,17 @@ int VFSWriter::blank_segment(const FSize& count, FSPos& insert){
 		this->stream->seekp(0, std::ios_base::end);
 		insert = this->stream->tellp();
 		buffer.write_to(*(this->stream));
-
-		return 0;
 	}
+
+	return *this;
+}
+
+
+VFSWriter& VFSWriter::write_to_vfs(OutputBuffer& buffer){
+	if (!this->state){
+		buffer.write_to(this->get_stream());
+	}
+	return *this;
 }
 
 

@@ -33,6 +33,10 @@ inline bool version_raised(const FSType& f){ return static_cast<FlagType>(FSType
 
 inline FSType pair_flags(const FSType& f1, const FSType& f2){ return static_cast<FSType>((FlagType)f1 | (FlagType)f2); }
 
+inline bool is_valid(const FSType& t){
+    return (!removed_raised(t)) && (file_raised(t) || folder_raised(t) || versionable_raised(t));
+}
+
 
 /**
  * 

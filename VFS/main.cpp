@@ -142,6 +142,8 @@ With the path deduction, the method could be moved to Container instead of FileS
 
 */
 
+// DEBUG: [General] Check that the letters' distribution for IDs is uniform.
+
 int main(int argc, char* argv[], char* env[]){
 	
 	srand(time(NULL));
@@ -149,7 +151,7 @@ int main(int argc, char* argv[], char* env[]){
 	FileSystem vfs("/tmp", true, "Carthage");
 
 	ArgsNewFolder anF1;
-	anF1.name = "F1";
+	anF1.name = "AAA";
 	anF1.icon = 3;
 
 	Container* dest = vfs.current();
@@ -159,7 +161,7 @@ int main(int argc, char* argv[], char* env[]){
 	}
 
 	ArgsNewFolder anF2;
-	anF2.name = "F2";
+	anF2.name = "BBB";
 	anF2.icon = 3;
 	
 	if (vfs.current()->create_folder(anF2)){
@@ -168,19 +170,20 @@ int main(int argc, char* argv[], char* env[]){
 
 
 	ArgsNewFolder anF3;
-	anF3.name = "F3";
+	anF3.name = "CCC";
 	anF3.icon = 3;
 	
 	if (vfs.current()->create_folder(anF3)){
 		std::cout << "FAILED 3.1" << std::endl;
 	}
 
-	if (vfs.current()->create_folder(anF3)){
-		std::cout << "FAILED 3.2" << std::endl;
-	}
 
 	vfs.current()->at(0).open();
 
+	anF1.name = "DDD";
+	anF2.name = "EEE";
+	anF3.name = "FFF";
+
 	if (vfs.current()->create_folder(anF1)){
 		std::cout << "FAILED 1" << std::endl;
 	}
@@ -193,8 +196,14 @@ int main(int argc, char* argv[], char* env[]){
 		std::cout << "FAILED 3.1" << std::endl;
 	}
 
-	FSObject src = vfs.current()->at(1);
 	vfs.current()->at(1).open();
+	std::vector<FSObject> sources = {
+		*(vfs.current())
+	};
+
+	anF1.name = "GGG";
+	anF2.name = "HHH";
+	anF3.name = "III";
 
 	if (vfs.current()->create_folder(anF1)){
 		std::cout << "FAILED 1" << std::endl;
@@ -208,16 +217,23 @@ int main(int argc, char* argv[], char* env[]){
 		std::cout << "FAILED 3.1" << std::endl;
 	}
 
-	std::cout << "reach" << std::endl;
-
-	vfs.replicate_to(src, dest, false, false);
-
-	std::cout << "passed" << std::endl;
+	vfs.copy_to(sources, dest);
 
 	vfs_to_json(vfs);
 
 	return 0;
 }
+
+
+/*
+
+Comment va -t- on gérer la copie d'éléments ? Est-il autorisé d'avoir des éléments qui ne sont pas instanciés et valides ?
+Ne devrait-on pas faire l'implémentation en n'utilisant jamais deduce_path() ? Tout objet devrait être généré légalement.
+
+=> Si on fait cette supposition, les objets devraient stocker leur chemin entier (sans la racine) au cas où il y ait destruction d'un parent.
+Dans l'état actuel, on ne peut faire une copie que sur un objet dont on est sur qu'aucun parent n'est détruit.
+
+*/
 
 
 /*

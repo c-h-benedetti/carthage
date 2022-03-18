@@ -9,6 +9,9 @@ VFSReader& VFSReader::read(T& t){
 }
 
 
+
+
+
 template <typename T>
 VFSWriter& VFSWriter::add(const T& t){
 	if (!this->state){
@@ -21,15 +24,13 @@ VFSWriter& VFSWriter::add(const T& t){
 
 
 template <typename T>
-int VFSWriter::override(const FSPos& pos, const T& t){
+VFSWriter& VFSWriter::override(const FSPos& pos, const T& t){
 	if (!this->state){
 		T data = t;
 		BeforeWriting<T>::behavior(data);
 		this->stream->seekp(pos);
 		this->stream->write((char*)&data, sizeof(T));
-		return 0;
 	}
-	else{
-		return this->state;
-	}
+
+	return *this;
 }
