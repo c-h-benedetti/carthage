@@ -25,7 +25,9 @@ bool StackSegment<N>::equals(const StackSegment<N>& s2) const{
 
 template <size_t N>
 StackSegment<N>::StackSegment(const void* c, const size_t& s){
-	this->override(c, s);
+	if (c && (s > 0)){
+		this->override(c, s);
+	}
 }
 
 
@@ -38,9 +40,11 @@ StackSegment<N>& StackSegment<N>::operator=(const StackSegment<N>& b){
 
 template <size_t N>
 void StackSegment<N>::override(const void* src, const size_t& s){
-	this->nullify();
-	size_t length = (s > N) ? (N) : (s);
-	memcpy(this->buffer, src, length);
+	if (src && (s > 0)){	
+		this->nullify();
+		size_t length = (s > N) ? (N) : (s);
+		memcpy(this->buffer, src, length);
+	}
 }
 
 
@@ -57,8 +61,32 @@ void StackSegment<N>::read_from(std::istream& s){
 
 
 template <size_t N>
+void StackSegment<N>::trim(const size_t& pos, const uint8_t& r){
+	for (size_t i = pos ; i < N ; i++){
+		this->buffer[i] = r;
+	}
+}
+
+
+template <size_t N>
+void StackSegment<N>::untail(){
+	bool met = false;
+	for (size_t i = 0 ; i < N ; i++){
+		if (this->buffer[i] == 0){
+			met = true;
+		}
+		if (met){
+			this->buffer[i] = 0;
+		}
+	}
+}
+
+
+template <size_t N>
 void StackSegment<N>::copy(void* dest) const{
-	memcpy(dest, this->buffer, N);
+	if (dest){
+		memcpy(dest, this->buffer, N);
+	}
 }
 
 
@@ -75,7 +103,9 @@ std::istream& operator>>(std::istream& o, StackSegment<K>& s){
 }
 
 template <size_t N>
-StackSegment<N>& StackSegment<N>::operator=(const char* str){
-	this->override(str, N);
+StackSegment<N>& StackSegment<N>::operator=(const void* str){
+	if (str){
+		this->override(str, N);
+	}
 	return *this;
 }

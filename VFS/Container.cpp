@@ -1,3 +1,4 @@
+#include "FSType.hpp"
 #include "FileSystem.hpp"
 
 /**
@@ -14,11 +15,28 @@ bool Container::name_exists(const Name& n, const Extension& ext) const{
 	bool found = false;
 
 	while ((i < this->size()) && !found){
-		found = (this->read(i).get_data().name == n) && (this->read(i).get_data().extension == ext);
+		const FSBlock& block = this->read(i).get_block();
+		found = (block.name == n) && (block.extension == ext);
 		i++;
 	}
 
 	return found;
+}
+
+
+bool Container::accepts(const FSType& flag) const{
+	if(file_raised(flag)){
+		return this->accepts_files();
+	}
+	else if(folder_raised(flag)){
+		return this->accepts_folders();
+	}
+	else if(versionable_raised(flag)){
+		return this->accepts_versionables();
+	}
+	else{
+		return false;
+	}
 }
 
 
@@ -32,44 +50,38 @@ bool Container::name_exists(const Name& n, const Extension& ext) const{
  * | Returns 3 if all attemps to create a valid path failed.
  * | Returns 4 or 8 if the new blocks could not be written in the VFS.
  */
-int Container::create_element(const FSize& count, FSBlock& blc, std::function<void(const Path&, const FSPos&)>& instanciating){
-	// 1. Checks that the name doesn't already exist in this Container
+int Container::create_element(const FSize& count, FSBlock& blc, std::function<void(const Path&, const FSPos&, FSBlock& modif)>& instanciating){
+	// 1. If the name already exists, we instantly abort.
 	if (this->name_exists(blc.name, blc.extension)){
 		return 1;
 	}
 	
-	// 2. Reserving segment(s) by the end of the VFS that will contain the new elements.
+	if (this->reload_from_vfs() || !this->is_valid()){
+		return 3;
+	}
+	// IMPROVE: [Container] Should we block the access to the VFS once this method started? What happens if this block is modified during this function?
+	// IMPROVE: [Container] The update of counters should be done during linking, we should not override blindly the VFS in case another thread added content at the same time. (a write-locker must be acquired)
+	// IMPROVE: [Container] When we link, the writing lock must be acquired before the linking starts.
+	
+	// 2. Reserving blank segment(s) at the end of the VFS that will contain the new elements.
 	FSPos insert = 0;
-
 	if (this->refer_to.vfs_io().ask_writer().blank_segments(count, insert).status() || !insert){
 		return 2;
 	}
 	
 	// 3. Building the path according to the data in the new block.
-	int status;
-	Path abs_path = this->data_path(&status);
-	
-	if (status){
-		abs_path = this->deduce_path(&status);
-	}
-	
-	if (status || !fs::exists(abs_path)){
-		return 3;
-	}
-	
+	Path abs_path = this->get_system_path();
+	// IMPROVE: [VFS_IO] The make_path() function should check some safety conditions.
 	abs_path = this->refer_to.vfs_io().make_path(abs_path, blc);
 	
 	// 4. Executing operations specific to a type of objects (like creating the block).
-	instanciating(abs_path, insert);
+	FSBlock edition;
+	instanciating(abs_path, insert, edition);
 
 	// 5. Writing blocks into the VFS
 
 	// IMPROVE: [Container] Handle linking error codes.
-	this->link_segment(insert);
-
-	if (this->override_vfs()){
-		return 4;
-	}
+	this->refer_to.vfs_io().ask_writer().link_segment(this->block_pos, this->block, insert, edition);
 
 	return 0;
 }
@@ -86,48 +98,11 @@ int Container::load(){
 
 	this->refer_to.vfs_io().ask_reader().browse_block_content(this->block.content, [&](const FSize& size, const FSBlock* blocks, const FSPos& c_pos, const FSPos& next){
 		for (size_t i = 0 ; i < size ; i++){
-			FSObject obj(this->refer_to, blocks[i], c_pos + i * sizeof(FSBlock));
-			obj.chain(this);
-			collected.push_back(obj);
+			collected.push_back(FSObject(this->refer_to, blocks[i], c_pos + i * sizeof(FSBlock), this));
 		}
 	});
 
 	this->dispatch(collected);
-
-	return 0;
-}
-// IMPROVE: [Container] Make the copy constructor override the chaining pointer of the contained FSObject.
-
-/**
- * Links the last inserted block(s) to the data already present in the VFS.
- * Either by filling the FSBlock::content, or by browsing the VFS to update the value of the "next" pointer.
- * 
- * | Returns 0 on success.
- * | Returns 1 in case of failing to read from the VFS.
- * | Returns 2 in case of failing to write to the VFS.
- */
-int Container::link_segment(const FSPos& insert, VFSWriter* writer){
-	
-	if (this->block.content == 0){ // This object is an empty Container.
-		this->block.content = insert;
-	}
-	else{
-
-		FSPos last = 0;
-
-		// IMPROVE: [Container] Asking for a reader will be refused if a writer is passed as parameter.
-
-		this->refer_to.vfs_io().ask_reader().browse_block_content(this->block.content, [&](const FSize& size, const FSBlock* blocks, const FSPos& c_pos, const FSPos& next){
-			last = c_pos + (size * sizeof(FSBlock));
-		});
-
-		if (writer){
-			writer->override<FSPos>(last, insert);
-		}
-		else{
-			this->refer_to.vfs_io().ask_writer().override<FSPos>(last, insert);
-		}
-	}
 
 	return 0;
 }
@@ -138,8 +113,8 @@ int Container::link_segment(const FSPos& insert, VFSWriter* writer){
 // # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 
-Container::Container(FileSystem& fs): FSObject(fs){}
-
 Container::Container(const FSObject& obj): FSObject(obj){}
 
-Container::Container(FileSystem& fs, const FSBlock& bck, const FSPos& pos): FSObject(fs, bck, pos){}
+Container::Container(FileSystem& fs, const FSPos& pos, Container* previous): FSObject(fs, pos, previous){}
+
+Container::Container(FileSystem& fs, const FSBlock& bck, const FSPos& pos, Container* previous): FSObject(fs, bck, pos, previous){}

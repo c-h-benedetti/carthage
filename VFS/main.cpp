@@ -98,56 +98,20 @@ void vfs_to_json(FileSystem& vfs){
 }
 
 
-void cheat_inspect_vfs(FileSystem& vfs){
-
-	std::ifstream str(vfs.vfs_io().vfs_path);
-
-	FSize seg_size = 0;
-	FSBlock block;
-	FSPos next = 0;
-
-	while (str.peek() != EOF){
-		str.read((char*)&seg_size, sizeof(FSize));
-		str.read((char*)&block, sizeof(FSBlock));
-		str.read((char*)&next, sizeof(FSPos));
-
-		std::cout << "Size: " << seg_size << std::endl;
-		std::cout << "Name: " << block.name << ", Parent: " << block.parent << ", Content: " << block.content << std::endl;
-		std::cout << "Next: " << next << std::endl;
-		std::cout << "========" << std::endl;
-	}
-
-	str.close();
-}
-
-
 /*
-
-- Après qu'on ait construit notre buffer avec replicate, est-il possible d'aller chercher les bons chemins pour faire
-les copies de fichiers? On a besoin de faire une copie que pour les fichiers, les dossiers peuvent être créés à la volée.
-
-
 - Comment déterminer si un objet est local ou non ? Les objets du VFS ne sont pas garantis d'exister sur le système.
+
 - On veut rajouter FSType::LINK pour pointer vers un autre objet. Toutes les actions faites sur cet objet doivent être
 répercutées sur l'original.
 
 */
 
-/*
-
-The replicate_to() function works only for one element, but it must be completed by another function.
-The first function must copy in a single segment the level 0 of what's copied.
-Then, on each newly created element, the replicate_to() function must be called to make a recursive copy.
-With the path deduction, the method could be moved to Container instead of FileSystem.
-
-*/
 
 // DEBUG: [General] Check that the letters' distribution for IDs is uniform.
+// DEBUG: [General] Some functions should systematically reload their argument from the VFS before performing anything.
+// DEBUG: [VFS] The VFS should only allow one modification at a time. How to make sure that the read data won't be discarded by the next writing?
 
-int main(int argc, char* argv[], char* env[]){
-	
-	srand(time(NULL));
-
+int some_test(){
 	FileSystem vfs("/tmp", true, "Carthage");
 
 	ArgsNewFolder anF1;
@@ -205,6 +169,14 @@ int main(int argc, char* argv[], char* env[]){
 	anF2.name = "HHH";
 	anF3.name = "III";
 
+	ArgsNewFile anf1;
+	anf1.name = "file1";
+	anf1.extension = "blend";
+
+	if (vfs.current()->create_file(anf1)){
+		std::cout << "FAILED 0" << std::endl;
+	}
+
 	if (vfs.current()->create_folder(anF1)){
 		std::cout << "FAILED 1" << std::endl;
 	}
@@ -217,35 +189,60 @@ int main(int argc, char* argv[], char* env[]){
 		std::cout << "FAILED 3.1" << std::endl;
 	}
 
-	vfs.copy_to(sources, dest);
+	vfs.copy_to(sources.data(), dest, 1, nullptr);
 
-	vfs_to_json(vfs);
+	// vfs_to_json(vfs);
+
+	vfs.make_hierarchy("/home/clement/Desktop/carthage/experimental/vfs_hierarchy/vfs.html");
 
 	return 0;
 }
 
+void test_versioning(){
+	FileSystem vfs("/tmp", true, "Carthage");
 
-/*
+	ArgsNewVersionable anV;
+	anV.name = "Some Stuff";
+	anV.icon = 8;
 
-Comment va -t- on gérer la copie d'éléments ? Est-il autorisé d'avoir des éléments qui ne sont pas instanciés et valides ?
-Ne devrait-on pas faire l'implémentation en n'utilisant jamais deduce_path() ? Tout objet devrait être généré légalement.
+	ArgsNewFile anf1;
+	anf1.name = "file1";
+	anf1.extension = "blend";
 
-=> Si on fait cette supposition, les objets devraient stocker leur chemin entier (sans la racine) au cas où il y ait destruction d'un parent.
-Dans l'état actuel, on ne peut faire une copie que sur un objet dont on est sur qu'aucun parent n'est détruit.
+	ArgsNewFolder anF3;
+	anF3.name = "CCC";
+	anF3.icon = 3;
 
-*/
+	ArgsNewFolder anF2;
+	anF2.name = "BBB";
+	anF2.icon = 3;
+
+	vfs.current()->create_versionable(anV);
+	vfs.current()->at(0).open();
+	vfs.current()->create_folder(anF3);
+	vfs.current()->versionable().commit();
+	vfs.current()->create_file(anf1);
+	vfs.current()->versionable().commit();
+	vfs.current()->create_folder(anF2);
+
+	vfs.make_hierarchy("/home/clement/Desktop/carthage/experimental/vfs_hierarchy/vfs.html");
+}
+
+int main(int argc, char* argv[], char* env[]){
+	
+	srand(time(NULL));
+
+	test_versioning();
+
+	return 0;	
+}
 
 
-/*
-The first block must be copied in an individual way because it can be part of another segment, if several elements
-have to be copied (not from a common root).
+// IMPROVE: [Versionable] Zip the content once the VFS is written (after a version was done). Unpacking a version will fetch the only zip in the Folder
+// IMPROVE: [General] Add the metadata file (useful for commit messages) and the dependencies file.
 
-Il faut check que la source n'est pas préfixe de la destination.
+// IMPROVE: [General] Try to make safer the building of path and the reference to parents. Maybe stock a representation of the parent?
 
-Si un versionable est trouvé dans la hiérarchie, vérifier qu'il peut être copié.
-=> Pour annuler l'opération, retirer le pointeur de contenu est assez. Si rien ne pointe sur les blocks corrompus
-ils seront laissés où ils sont.
-*/
 
 
 

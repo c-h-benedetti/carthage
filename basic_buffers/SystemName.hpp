@@ -10,7 +10,7 @@ class SystemName : public StackSegment<SIZE_OF_SYSNAME>{
 
 public:
 	
-	SystemName(const ID& id, const Extension& ext);
+	// SystemName(const ID& id, const Extension& ext); // -> Deprecated since we chose not to include extensioon in file names
 	SystemName(const ID& id);
 
 };

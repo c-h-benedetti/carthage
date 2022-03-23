@@ -13,12 +13,14 @@ private:
 
 public:
 
+	int commit(const char* msg=nullptr);
+
 	int open() override;
 
 	Versionable() = delete;
-	Versionable(FileSystem& fs);
 	Versionable(const FSObject& obj);
-	Versionable(FileSystem& fs, const FSBlock& bck, const FSPos& pos);
+	Versionable(FileSystem& fs, const FSPos& pos, Container* previous=nullptr);
+	Versionable(FileSystem& fs, const FSBlock& bck, const FSPos& pos, Container* previous=nullptr);
 
 	friend class FileSystem;
 

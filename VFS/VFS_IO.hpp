@@ -5,17 +5,13 @@
 #include <memory>
 #include <functional>
 #include <vector>
-#include <deque>
 #include "InputBuffer.hpp"
 #include "OutputBuffer.hpp"
 #include "FSBlock.hpp"
+#include "utils.h"
 
 
-enum VFSError: int{
-	OK, // So far so good!
-	OPEN_FAIL, // Failed to open an xstream
-	INVALID_COUNT, // Requested a segment of size 0 or the insertion of 0 segments
-};
+class VFS_IO;
 
 // # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 // #                                                                                             #
@@ -31,15 +27,15 @@ enum VFSError: int{
  */
 class VFSReader {
 
-	int state = VFSError::OK; /// Internal state of the object. Any value > 0 indicates a problem.
+	int state = 0; /// Internal state of the object. Any value > 0 indicates a problem.
 	std::unique_ptr<std::ifstream> stream = nullptr; /// Dynamic pointer to the current stream
 	std::function<void()> callback; /// Callback function, summoned in the destructor
 
-	const Path& vfs_path; /// Proxy reference to the path held by the VFS_IO object.
+	VFS_IO& vfs_io; /// Proxy reference to the path held by the VFS_IO object.
 
 private: 
 
-	void raise(const VFSError& err){ this->state |= err; }
+	void raise(const int& err){ this->state |= err; }
 
 	/// Opens a new stream.
 	int open();
@@ -65,38 +61,23 @@ public:
 	inline int status() const{ return this->state; }
 
 	/// Browses the VFS linearly, segment by segment, ignoring the hierarchy.
-	int linear_browsing(std::function<void(const FSize&, const FSBlock*, const FSPos&, const FSPos&)> f);
+	VFSReader& linear_browsing(std::function<void(const FSize&, const FSBlock*, const FSPos&, const FSPos&)> f);
 
 	/// Browses the content of a Container. #cont_pos is the position of the content (FSBlock::content), so a segment pointer.
-	int browse_block_content(const FSPos& cont_pos, std::function<void(const FSize&, const FSBlock*, const FSPos&, const FSPos&)> f);
+	VFSReader& browse_block_content(const FSPos& cont_pos, std::function<void(const FSize&, const FSBlock*, const FSPos&, const FSPos&)> f);
 
 	/// Reads the FSBlock located at #pos in the VFS. #pos is a block pointer.
-	int probe_fsblock(const FSPos& pos, FSBlock& block);
+	VFSReader& probe_fsblock(const FSPos& pos, FSBlock& block);
 
 	/// Browses the FSBlock::parent field until the root. Includes the summoner's block (at #pos)
-	int backtrack(std::vector<FSBlock>& blocks, const FSPos& pos);
+	VFSReader& backtrack(std::vector<FSBlock>& blocks, const FSPos& pos);
 
-	/// Recursively browses the whole hierarchy from the given block. #root_pos is a block address.
-	/*void recursive_hierarchy(
-		size_t depth, 
-		const FSBlock& block, 
-		const Path& p, 
-		std::function<void(const FSBlock&, const size_t&, const Path&)>& f,
-		std::function<void(const FSBlock&, const size_t&, const Path&, const std::vector<FSBlock>& content)>& f2
-	);*/
+	VFSReader& fetch_level(const FSBlock& b, std::vector<FSBlock>& blocks, FSize& sz);
 
-	/*int browse_hierarchy(
-		const FSPos& root_pos, 
-		std::function<void(const FSBlock&, const size_t&, const Path&)> f,
-		std::function<void(const FSBlock&, const size_t&, const Path&, const std::vector<FSBlock>& content)> f2
-	);*/
-
-	FSize fetch_level(const FSBlock& b, std::deque<FSBlock>& blocks);
-
-	void iterative_bfs_hierarchy(const FSPos& start);
+	VFSReader& iterative_dfs_hierarchy(const FSPos& start, const std::function<void(const FSBlock&, const size_t&)>& cb);
 
 	VFSReader() = delete;
-	VFSReader(const Path& p, std::function<void()> c);
+	VFSReader(VFS_IO& v, std::function<void()> c);
 
 	~VFSReader();
 };
@@ -118,15 +99,15 @@ public:
  */
 class VFSWriter {
 
-	int state = VFSError::OK; /// Internal state of the object. Any value > 0 indicates a problem.
+	int state = 0; /// Internal state of the object. Any value > 0 indicates a problem.
 	std::unique_ptr<std::ofstream> stream; /// Dynamic pointer to the current stream
 	std::function<void()> callback; /// Callback function, summoned in the destructor
 
-	const Path& vfs_path; /// Proxy reference to the path held by the VFS_IO object.
+	VFS_IO& vfs_io; /// Proxy reference to the path held by the VFS_IO object.
 
 private: 
 
-	void raise(const VFSError& err){ this->state |= err; }
+	void raise(const int& err){ this->state |= err; }
 
 	/// Opens a new stream.
 	int open();
@@ -142,9 +123,11 @@ public:
 	inline std::ofstream& get_stream(){ return *(this->stream); }
 
 	inline VFSWriter& head(FSPos* pos = nullptr){
-		this->stream->seekp(0, std::ios_base::end);
-		if (pos){
-			*pos = this->stream->tellp();
+		if (!this->state && !this->open()){
+			this->stream->seekp(0, std::ios_base::end);
+			if (pos){
+				*pos = this->stream->tellp();
+			}
 		}
 		return *this;
 	}
@@ -154,6 +137,10 @@ public:
 	VFSWriter& override(const FSPos& pos, const T& t);
 
 	VFSWriter& write_to_vfs(OutputBuffer& buffer);
+
+	VFSWriter& replicate_to(const FSBlock& source, const FSBlock& destination, Path path_src, Path path_dst, const FSPos& root_loc);
+
+	VFSWriter& link_segment(const FSPos& pos, FSBlock& block, const FSPos& insert, const FSBlock& editions);
 
 	/// Inserts #count blank segments of size 1 at the end of the VFS.
 	VFSWriter& blank_segments(const FSize& count, FSPos& insert);
@@ -172,7 +159,7 @@ public:
 	inline int status() const{ return this->state; }
 
 	VFSWriter() = delete;
-	VFSWriter(const Path& p, std::function<void()> c, const bool& reset=false);
+	VFSWriter(VFS_IO& v, std::function<void()> c, const bool& reset=false);
 
 	~VFSWriter();
 };
@@ -191,6 +178,12 @@ class VFS_IO {
 	size_t readers_count = 0;
 	size_t writers_count = 0;
 
+	friend class VFSReader;
+	friend class VFSWriter;
+
+	VFSReader ghost_reader();
+	VFSWriter ghost_writer(const bool& reset=false);
+
 public:
 
 	const Path user_root;
@@ -203,6 +196,7 @@ public:
 
 	// Concatenation of base_path and the name built from the block
 	Path make_path(const Path& base_path, FSBlock& block);
+	inline bool is_from(const Path& p) const{ return a_starts_with_b(p.c_str(), this->user_root.c_str()); }
 
 	VFS_IO(const Path& u_root);
 };
@@ -231,7 +225,47 @@ void mirror_bytes(A& a){
 }
 
 
-#include "VFS_IO.tpp"
+template <typename T>
+VFSReader& VFSReader::read(T& t){
+	if (!this->state && !this->open()){
+		this->stream->read((char*)&t, sizeof(T));
+		AfterReading<T>::behavior(t);
+	}
+	else{
+		this->raise(8);
+	}
+	return *this;
+}
+
+
+template <typename T>
+VFSWriter& VFSWriter::add(const T& t){
+	if (!this->state && !this->open()){
+		T copy = t;
+		BeforeWriting<T>::behavior(copy);
+		this->stream->write((char*)&copy, sizeof(T));
+	}
+	else{
+		this->raise(9);
+	}
+	return *this;
+}
+
+
+template <typename T>
+VFSWriter& VFSWriter::override(const FSPos& pos, const T& t){
+	if (!this->state && !this->open()){
+		T data = t;
+		BeforeWriting<T>::behavior(data);
+		this->stream->seekp(pos);
+		this->stream->write((char*)&data, sizeof(T));
+	}
+	else{
+		this->raise(10);
+	}
+
+	return *this;
+}
 
 
 #endif // VFS_IO_OPERATIONS_HPP_INCLUDED

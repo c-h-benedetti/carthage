@@ -1,7 +1,9 @@
+#include "FSType.hpp"
 #include "SystemName.hpp"
 #include "FileSystem.hpp"
 #include "File.hpp"
 #include "Versionable.hpp"
+#include <filesystem>
 #include <fstream>
 #include <vector>
 
@@ -38,75 +40,45 @@ bool FSObject::is_current() const{
 }
 
 
-/**
- * Builds the path of this block by following the @previous pointer until finding a nullptr.
- * The returned path can be invalid if the chain is broken.
- * Even on success, the returned path doesn't necessarily exist.
- * If #check points to an integer, it will contain the execution's status code.
- *  | 0: Success
- *  | 1: Error, the root was not found along the path.
- * 
- * Return value:
- *  | If the operation is a success (status code 0) the path is returned.
- *  | If the root is missing (status code 1), an empty path is returned.
- */
-Path FSObject::data_path(int* check) const{
-	// 1. Initialization by fetching the list of objects along the path.
-	Path path = "";
-	int status = 0;
-
-	std::vector<const FSObject*> list;
-	list.push_back(this);
-	FSObject* prev = this->previous;
-
-	// DEBUG: [FSObject] Check que root n'est rencontré qu'une fois, que le previous de la root est nullptr.
-	while (prev){
-		list.push_back(prev);
-		prev = prev->previous;
+bool FSObject::is_valid() const{
+	if (removed_raised(this->block.flag) || is_undefined(this->block.flag)){
+		return false;
 	}
-
-	// 2. If the last recorded object is not the root, the path won't be valid, we can abort.
-	if (!root_raised(list.back()->get_data().flag)){
-		status = 1;
+	else if(!fs::exists(this->system_path) || !this->refer_to.vfs_io().is_from(this->system_path)){
+		return false;
+	}
+	else if(this->block_pos == 0){
+		return false;
 	}
 	else{
-		// 3. Assembling the path.
-		path = this->refer_to.vfs_io().user_root;
-		// IMPROVE: [FSObject] Check if a way exists to reserve some place for the path.
-		size_t l_size = list.size();
-		for (size_t i = 0 ; i < l_size ; i++){
-			path /= list[l_size - i - 1]->get_system_name();
-		}
+		return true;
 	}
-
-	if (check){ *check = status; }
-
-	return path;
 }
 
 
-Path FSObject::deduce_path(int* check) const{
-	std::vector<FSBlock> blocks;
-	int status = 0;
+Path FSObject::deduce_path() const{
 	Path p = "";
 
-	if (this->refer_to.vfs_io().ask_reader().backtrack(blocks, this->block_pos)){
-		status = 1;
+	if (this->previous){
+		SystemName sn{this->block.id};
+		p = this->previous->system_path / sn.c_str();
 	}
 	else{
-		p = this->refer_to.vfs_io().user_root;
-		size_t b_size = blocks.size();
-		for (size_t i = 0 ; i < b_size ; i++){
-			SystemName sn{blocks[b_size - i - 1].id, blocks[b_size - i - 1].extension};
-			p /= sn.c_str();
+		std::vector<FSBlock> blocks;
+		
+		if (!this->refer_to.vfs_io().ask_reader().backtrack(blocks, this->block_pos).status()){
+			p = this->refer_to.vfs_io().user_root;
+			size_t b_size = blocks.size();
+			
+			for (size_t i = 0 ; i < b_size ; i++){
+				SystemName sn{blocks[b_size - i - 1].id};
+				p /= sn.c_str();
+			}
 		}
 	}
-
-	if (check){ *check = status; }
-
+	
 	return p;
 }
-
 
 
 /**
@@ -115,27 +87,10 @@ Path FSObject::deduce_path(int* check) const{
  * Checks if this object was removed in the VFS.
  * 
  * | Returns 0 on success.
- * | Returns 1 if the object is marked as being removed in the VFS.
- * | Returns 2 if the VFS could not be opened.
- * | Returns 3 if the block_pos == 0 (nullptr for the VFS).
+ * | Returns 1 if failed or the object is marked as being removed in the VFS.
  */
 int FSObject::reload_from_vfs(){
-	int status = this->refer_to.vfs_io().ask_reader().probe_fsblock(this->block_pos, this->block);
-
-	if (status){
-		return status;
-	}
-	else{
-		// IMPROVE: [FSObject] If the object was deleted, the FileSystem must react and find a stable state.
-		if (removed_raised(this->block.flag)){
-			return 20;
-		}
-		else{
-			SystemName sn{this->block.id, this->block.extension};
-			this->system_name = sn.c_str();
-			return 0;
-		}
-	}
+	return (this->refer_to.vfs_io().ask_reader().probe_fsblock(this->block_pos, this->block).status() || removed_raised(this->block.flag));
 }
 
 
@@ -160,10 +115,12 @@ int FSObject::override_vfs() const{
 // # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 
-FSObject::FSObject(FileSystem& fs): refer_to(fs), previous(nullptr){}
-
-
-FSObject::FSObject(FileSystem& fs, const FSBlock& bck, const FSPos& pos, Container* link): block_pos(pos), block(bck), refer_to(fs), previous(link){
-	SystemName sn{this->block.id, this->block.extension};
-	this->system_name = sn.c_str();
+FSObject::FSObject(FileSystem& fs, const FSPos& pos, Container* link): refer_to(fs), block_pos(pos), previous(link){
+	if (pos){
+		this->reload_from_vfs();
+	}
+	this->system_path = this->deduce_path();
 }
+
+// IMPROVE: [FSObject] This last constructor should be removed, we should find a way to use only the previous one which much safer in terms of data validity.
+FSObject::FSObject(FileSystem& fs, const FSBlock& bck, const FSPos& pos, Container* link): refer_to(fs), block_pos(pos), block(bck), previous(link), system_path(this->deduce_path()){}

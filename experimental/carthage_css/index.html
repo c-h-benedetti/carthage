@@ -1,0 +1,59 @@
+<!doctype HTML>
+
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>Carthage</title>
+
+		<!--
+		<script crossorigin src="https://unpkg.com/react@17/umd/react.production.min.js"></script>
+		<script crossorigin src="https://unpkg.com/react-dom@17/umd/react-dom.production.min.js"></script>
+		-->
+		<script crossorigin src="https://unpkg.com/react@17/umd/react.development.js"></script>
+		<script crossorigin src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
+
+		<script crossorigin src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+
+		<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Oxygen">
+		<link href="https://cdn.jsdelivr.net/npm/remixicon@2.5.0/fonts/remixicon.css" rel="stylesheet">
+
+		<link rel="stylesheet" type="text/css" href="base.css">
+	</head>
+
+	<body>
+		<div id="bandeau"></div>
+		<div id="page">
+			<div id="left_toolbox">
+				<div id="left_tools"></div>
+				<div id="connection_status"></div>
+			</div>
+			<div id="main_block"></div>
+		</div>
+	</body>
+
+	<footer>
+		<script src="base.js" type="text/babel"></script>
+	</footer>
+</html>
+
+<!-- 
+
+- [ ] La recherche va devoir afficher un menu déroulant avec ce qui a été trouvé. Ce menu sera surement en "position: absolute" pour pouvoir passer par dessus tout le reste.
+
+- [ ] Remplacer le texte online / offline par un point de couleur, ou simplement le nuage avec une couleur.
+
+- [ ] Ajouter les slots pour un profil d'utilisateur en haut à droite. Également ajouter des notifications. (pour le système de chat plus tard)
+
+- [ ] Changer l'apparance de la barre de scrolling sur chrome et brave
+
+- [ ] Remettre des boutons pour changer le mode d'affichage et le mode de classement.
+
+- [ ] La case du status de connexion à 5% de hauteur est presque trop haute sur grand écran, et trop petite sur écran normal.
+
+- [ ] Quand on va ajouter le profil à la barre du haut il va surement y avoir un pb quand la page est ultra fine, étant donné que ça tombe actuellement tout juste.
+
+- [ ] Besoin d'uniformiser la répartition des blocs de projets, sachant que center n'a pas l'air de marcher.
+
+=> L'utilisation de ES6 fait qu'on confirme et bloque le fait que Carthage aura un serveur HTTP embed.
+
+-->

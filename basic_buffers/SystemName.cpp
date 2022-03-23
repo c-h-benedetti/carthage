@@ -1,17 +1,16 @@
 #include "SystemName.hpp"
 
-SystemName::SystemName(const ID& id, const Extension& ext){
+/*SystemName::SystemName(const ID& id, const Extension& ext){
 	this->nullify();
-	size_t length_id = id.length();
-	memcpy(this->buffer, id.buffer, length_id);
+	memcpy(this->buffer, id.buffer, SIZE_OF_ID);
+
 	if (ext.length()){
-		this->buffer[length_id] = '.';
-		memcpy(this->buffer + length_id + 1, ext.buffer, ext.length());
+		this->buffer[SIZE_OF_ID - 1] = '.';
+		memcpy(this->buffer + SIZE_OF_ID, ext.buffer, ext.length());
 	}
-}
+}*/
 
 SystemName::SystemName(const ID& id){
 	this->nullify();
-	size_t length_id = id.length();
-	memcpy(this->buffer, id.buffer, length_id);
+	memcpy(this->buffer, id.buffer, SIZE_OF_ID);
 }

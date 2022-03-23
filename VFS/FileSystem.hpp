@@ -19,7 +19,7 @@ private:
 	int open_root(); /// Opens the root of the project from the VFS.
 	int new_vfs(const char* n); /// Creates a new Carthage setup from the user provided path.
 	inline void add(Container* c){ if (c){this->stack.push_back(c);} }
-	inline int open(){ return this->stack.back()->load(); }
+	inline int open(){ return this->stack.back()->open(); }
 	void create(const FSObject& src, const Path& src_path, const Path& dst_path);
 	void replicate_to(const FSObject& source, FSObject& dst);
 
@@ -28,9 +28,9 @@ public:
 	inline VFS_IO& vfs_io() { return this->io_manager; }
 	inline Container* current() { return this->stack.back(); }
 
-	void copy_to(std::vector<FSObject>& sources, Container* dest);
+	void copy_to(FSObject* sources, Container* dest, const size_t& nb_items, FSBlock* as=nullptr);
 
-	//void make_hierarchy(const Path& out) const; /// Creates an HTML file (out is a path: "/abc/def/.../xxx.html")
+	void make_hierarchy(const Path& out); /// Creates an HTML file (out is a path: "/abc/def/.../xxx.html")
 
 	FileSystem() = delete;
 	FileSystem(const Path& p, bool reset=false, const char* n=nullptr);

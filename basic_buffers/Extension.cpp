@@ -12,6 +12,7 @@ Extension::Extension(const char* c){
 }
 
 void Extension::override(const void* src, const size_t& s){
+	this->nullify();
 	this->StackSegment::override(src, s);
 	this->buffer[SIZE_OF_EXTENSION - 1] = 0;
 }

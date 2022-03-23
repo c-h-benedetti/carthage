@@ -29,7 +29,7 @@ template <size_t K>
 class BufferReader{
 
 	size_t pos = 0;
-	const BasicBuffer<K>* buffer;
+	const BasicBuffer<K>& buffer;
 
 public:
 

@@ -30,5 +30,6 @@ using Path = fs::path;
 #define FIRST_BLOCK_POSITION sizeof(FSize)
 
 int touch(const Path& path);
+bool a_starts_with_b(const char* a, const char* b);
 
 #endif // GENERAL_UTILS_HPP_INCLUDED

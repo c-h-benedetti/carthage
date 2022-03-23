@@ -13,7 +13,7 @@ void Folder::dispatch(const std::vector<FSObject>& segment){
 
 	// IMPROVE: [Folder] Check that nothing with a CURRENT or a VERSION flag is here.
 	for(const FSObject& obj : segment){
-		if (!removed_raised(obj.get_data().flag)){
+		if (!removed_raised(obj.get_block().flag)){
 			this->content.push_back(obj);
 		}
 	}
@@ -24,13 +24,13 @@ int Folder::open(){
 	return this->load();
 }
 
-
+// IMPROVE: [Folder] Since we don't necessarily chain everything anymore, we should check by the VFS if a Folder can accept a Versionable.
 bool Folder::accepts_versionables() const{
 	bool found = false;
 	Container* prev = this->previous;
 
 	while (prev && !found){
-		found = versionable_raised(prev->get_data().flag);
+		found = versionable_raised(prev->get_block().flag);
 		prev = (Container*)prev->get_previous();
 	}
 
@@ -50,7 +50,7 @@ int Folder::create_file(const ArgsNewFile& args){
 	b.flag = FSType::FILE;
 	b.parent = this->block_pos;
 
-	std::function<void(const Path&, const FSPos&)> instanciating = [&](const Path& abs_path, const FSPos& insert){
+	std::function<void(const Path&, const FSPos&, FSBlock&)> instanciating = [&](const Path& abs_path, const FSPos& insert, FSBlock& modif){
 		if (touch(abs_path)){
 			return;
 		}
@@ -60,15 +60,15 @@ int Folder::create_file(const ArgsNewFile& args){
 		FSObject fi(
 			this->refer_to,
 			b, 
-			insert + sizeof(FSize)
+			insert + sizeof(FSize),
+			this
 		);
-		fi.chain(this);
 
-		if (fi.override_vfs()){
+		if (fi.override_vfs()){ // This object is brand new, nobody can be modifying it at this time, so we can use override_vfs.
 			return;
 		}
 
-		this->block.nb_files++;
+		modif.nb_files++;
 		this->content.push_back(fi);
 	};
 
@@ -91,7 +91,7 @@ int Folder::create_folder(const ArgsNewFolder& args){
 	b.flag = FSType::FOLDER;
 	b.parent = this->block_pos;
 
-	std::function<void(const Path&, const FSPos&)> instanciating = [&](const Path& abs_path, const FSPos& insert){
+	std::function<void(const Path&, const FSPos&, FSBlock&)> instanciating = [&](const Path& abs_path, const FSPos& insert, FSBlock& modif){
 		if (!fs::create_directory(abs_path)){
 			return;
 		}
@@ -101,15 +101,15 @@ int Folder::create_folder(const ArgsNewFolder& args){
 		FSObject fdr(
 			this->refer_to,
 			b, 
-			insert+sizeof(FSize) 
+			insert+sizeof(FSize),
+			this
 		);
-		fdr.chain(this);
 
-		if (fdr.override_vfs()){
+		if (fdr.override_vfs()){ // This object is brand new, nobody can be modifying it at this time, so we can use override_vfs.
 			return;
 		}
 
-		this->block.nb_folders++;
+		modif.nb_folders++;
 		this->content.push_back(fdr);
 	};
 
@@ -122,6 +122,8 @@ int Folder::create_folder(const ArgsNewFolder& args){
 }
 
 // IMPROVE: [Folder] Evaluate the functions accepts_xxx() before doing anything in create_xxx()
+
+// IMPROVE: [Versionable] Safety if current version doesn't exist (nullptr)
 
 /**
  * Creating a new versionable
@@ -139,9 +141,10 @@ int Folder::create_versionable(const ArgsNewVersionable& args){
 	FSBlock b_c;
 	b_c.id.randomize();
 	b_c.icon = 0;
+	b_c.name = "Current";
 	b_c.flag = pair_flags(FSType::CURRENT, FSType::FOLDER);
 
-	std::function<void(const Path&, const FSPos&)> instanciating = [&](const Path& abs_path, const FSPos& insert){
+	std::function<void(const Path&, const FSPos&, FSBlock&)> instanciating = [&](const Path& abs_path, const FSPos& insert, FSBlock& modif){
 		
 		SystemName sn{b_c.id};
 		Path c_path = abs_path / sn.c_str();
@@ -159,16 +162,17 @@ int Folder::create_versionable(const ArgsNewVersionable& args){
 		FSObject ver(
 			this->refer_to,
 			b_v,
-			insert+sizeof(FSize)
+			insert+sizeof(FSize),
+			this
 		);
-		ver.chain(this);
 
 		// This object is just to be written in the VFS, it must not be added in the content on this Container.
 		// It must not be chained either.
 		FSObject fdr(
 			this->refer_to,
 			b_c, 
-			insert + sizeof(FSize) + sizeof(FSBlock) + sizeof(FSPos) + sizeof(FSize)
+			insert + sizeof(FSize) + sizeof(FSBlock) + sizeof(FSPos) + sizeof(FSize),
+			(Container*)&ver
 		);
 
 
@@ -177,7 +181,7 @@ int Folder::create_versionable(const ArgsNewVersionable& args){
 		}
 		
 		// 4. Updating values in objects
-		this->block.nb_versionables++;
+		modif.nb_versionables++;
 		this->content.push_back(ver);
 	};
 
@@ -194,8 +198,8 @@ int Folder::create_versionable(const ArgsNewVersionable& args){
 // # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 
-Folder::Folder(FileSystem& fs): Container(fs){}
-
 Folder::Folder(const FSObject& obj): Container(obj){}
 
-Folder::Folder(FileSystem& fs, const FSBlock& bck, const FSPos& pos): Container(fs, bck, pos){}
+Folder::Folder(FileSystem& fs, const FSPos& pos, Container* previous): Container(fs, pos, previous){}
+
+Folder::Folder(FileSystem& fs, const FSBlock& bck, const FSPos& pos, Container* previous): Container(fs, bck, pos, previous){}

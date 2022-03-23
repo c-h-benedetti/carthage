@@ -4,7 +4,7 @@
 #include <cinttypes>
 
 /// Type used in the enum of FSType
-using FlagType = u_char;
+using FlagType = uint8_t;
 
 /**
  * Representation of all possible base types for a block.
